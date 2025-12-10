@@ -1,0 +1,5 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.text-muted-foreground { color: rgba(100,100,100,0.9); }
