@@ -5,7 +5,6 @@ import { UserTable } from "./components/UserTable";
 import { columns as productColumns } from "./products-columns";
 import { columns as userColumns } from "./users-columns";
 
-// Define proper types for API response
 type ProductApiResponse = {
   products: any[];
   total: number;
@@ -41,7 +40,6 @@ function App() {
         const data: ProductApiResponse = await response.json();
         setProducts(data.products);
         
-        // Set mock user data since we don't have a user API endpoint
         setUsers([
           {
             id: "1",
@@ -104,7 +102,7 @@ function App() {
 
   if (error) {
     return (
-      <div className="max-w-7xl mx-auto p-8">
+      <div className="max-w-9xl mx-auto p-8">
         <div className="bg-red-50 text-red-700 p-4 rounded-lg">
           Error: {error}
         </div>
@@ -114,7 +112,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-100 p-4 md:p-8">
-      <div className="max-w-7xl mx-auto">
+      <div className="mx-auto w-full">
         <div className="flex border-b border-gray-200 mb-6">
           <button
             onClick={() => setActiveTab("products")}
@@ -152,7 +150,7 @@ function App() {
             <h1 className="text-2xl md:text-3xl font-bold mb-6 text-gray-800 text-center">
               Users
             </h1>
-            <div className="bg-white rounded-lg shadow overflow-hidden border">
+            <div className="bg-white rounded-lg shadow overflow-hidden border p-5 md:p-8">
               <UserTable data={users} columns={userColumns} />
             </div>
           </div>
