@@ -50,7 +50,7 @@ export type User = {
   createdAt: string;
 };
 
-export const columns: ColumnDef<User>[] = [
+export const columns: ColumnDef<User, unknown>[] = [
   {
     accessorKey: "name",
     header: ({ column }) => (

@@ -1,7 +1,22 @@
+// src/products-columns.tsx
 import { ColumnDef } from "@tanstack/react-table";
-import { Product } from "./products-data";
 
-export const columns: ColumnDef<Product>[] = [
+export type Product = {
+  id: number;
+  title: string;
+  description: string;
+  price: number;
+  discountPercentage: number;
+  rating: number;
+  stock: number;
+  brand: string;
+  category: string;
+  thumbnail: string;
+  images: string[];
+  availabilityStatus: "In Stock" | "Low Stock" | "Out of Stock";
+};
+
+export const columns: ColumnDef<Product, unknown>[] = [
   {
     accessorKey: "thumbnail",
     header: "",

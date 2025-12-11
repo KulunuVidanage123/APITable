@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { DataTable } from "./components/ProductTable";
 import { UserTable } from "./components/UserTable";
+import { Dashboard } from "./components/Dashboard"; 
 import { columns as productColumns } from "./products-columns";
 import { columns as userColumns } from "./users-columns";
 
@@ -22,7 +23,7 @@ type User = {
 };
 
 function App() {
-  const [activeTab, setActiveTab] = useState("products");
+  const [activeTab, setActiveTab] = useState("dashboard"); 
   const [products, setProducts] = useState<any[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -115,6 +116,16 @@ function App() {
       <div className="mx-auto w-full">
         <div className="flex border-b border-gray-200 mb-6">
           <button
+            onClick={() => setActiveTab("dashboard")}
+            className={`px-4 py-2 font-medium text-sm ${
+              activeTab === "dashboard"
+                ? "text-blue-600 border-b-2 border-blue-600"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            Dashboard
+          </button>
+          <button
             onClick={() => setActiveTab("products")}
             className={`px-4 py-2 font-medium text-sm ${
               activeTab === "products"
@@ -136,7 +147,13 @@ function App() {
           </button>
         </div>
 
-        {activeTab === "products" ? (
+        {activeTab === "dashboard" ? (
+          <Dashboard 
+            products={products} 
+            users={users} 
+            setActiveTab={setActiveTab}
+          />
+        ) : activeTab === "products" ? (
           <div>
             <h1 className="text-2xl md:text-3xl font-bold mb-6 text-gray-800 text-center">
               Products
