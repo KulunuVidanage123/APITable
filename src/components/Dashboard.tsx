@@ -12,7 +12,6 @@ import {
   ResponsiveContainer 
 } from "recharts";
 import { ArrowUpRight, ArrowDownRight, Users, ShoppingCart, Package, DollarSign } from "lucide-react";
-// import { DataTable } from "./ui/data-table";
 
 interface Product {
   id: number;
@@ -54,7 +53,21 @@ interface Product {
   weight: number;
 }
 
+// Updated User interface to match the structure from App.tsx
 interface User {
+  id: string;
+  firstName: string;
+  lastName: string;
+  age: number;
+  gender: string;
+  email: string;
+  phone: string;
+  dateOfBirth: string;
+  role: string;
+}
+
+// Interface for Dashboard's internal user representation
+interface DashboardUser {
   id: string;
   name: string;
   email: string;
@@ -114,7 +127,19 @@ const salesData = [
   { name: "Jun", sales: 7000 },
 ];
 
-export function Dashboard({ products: propProducts, users: propUsers, setActiveTab: propSetActiveTab }: DashboardProps) {
+// Transform users from the new format to what Dashboard expects
+const transformUsersForDashboard = (users: User[]): DashboardUser[] => {
+  return users.map(user => ({
+    id: user.id,
+    name: `${user.firstName} ${user.lastName}`,
+    email: user.email,
+    role: user.role,
+    status: "active", // Default status since we don't have this field anymore
+    createdAt: user.dateOfBirth || new Date().toISOString()
+  }));
+};
+
+export function Dashboard({ products: propProducts, users: propUsers = [], setActiveTab: propSetActiveTab }: DashboardProps) {
   const [activeTab, setActiveTab] = useState(propSetActiveTab ? "products" : "products");
   const [dashboardData, setDashboardData] = useState({
     totalRevenue: "$12,345",
@@ -128,50 +153,18 @@ export function Dashboard({ products: propProducts, users: propUsers, setActiveT
   });
   
   const [products, setProducts] = useState<Product[]>(propProducts || []);
-  const [users, ] = useState<User[]>(propUsers || [
-    {
-      id: "1",
-      name: "John Doe",
-      email: "john.doe@example.com",
-      role: "admin",
-      status: "active",
-      createdAt: "2023-01-15T09:30:00Z",
-    },
-    {
-      id: "2",
-      name: "Jane Smith",
-      email: "jane.smith@example.com",
-      role: "user",
-      status: "active",
-      createdAt: "2023-02-20T14:22:00Z",
-    },
-    {
-      id: "3",
-      name: "Robert Johnson",
-      email: "robert.j@example.com",
-      role: "user",
-      status: "inactive",
-      createdAt: "2023-03-05T11:15:00Z",
-    },
-    {
-      id: "4",
-      name: "Emily Davis",
-      email: "emily.davis@example.com",
-      role: "manager",
-      status: "active",
-      createdAt: "2023-04-12T16:45:00Z",
-    },
-    {
-      id: "5",
-      name: "Michael Wilson",
-      email: "m.wilson@example.com",
-      role: "user",
-      status: "pending",
-      createdAt: "2023-05-08T10:20:00Z",
-    },
-  ]);
+  const [dashboardUsers, setDashboardUsers] = useState<DashboardUser[]>(transformUsersForDashboard(propUsers));
   const [loading, setLoading] = useState(!propProducts);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Update dashboard users when propUsers changes
+    setDashboardUsers(transformUsersForDashboard(propUsers));
+    setDashboardData(prev => ({
+      ...prev,
+      totalUsers: propUsers.length.toString(),
+    }));
+  }, [propUsers]);
 
   useEffect(() => {
     if (propProducts) return;
@@ -249,17 +242,10 @@ export function Dashboard({ products: propProducts, users: propUsers, setActiveT
         totalRevenue: "$12,432",
         revenueTrend: 13.2
       }));
-      
-      if (!propUsers) {
-        setDashboardData(prev => ({
-          ...prev,
-          totalUsers: users.length.toString(),
-        }));
-      }
     }, 2000);
     
     return () => clearTimeout(timer);
-  }, [propProducts, propUsers, users.length]);
+  }, [propProducts]);
 
   const handleTabChange = (tab: string) => {
     if (propSetActiveTab) {
@@ -479,7 +465,7 @@ export function Dashboard({ products: propProducts, users: propUsers, setActiveT
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                          {users.slice(0, 5).map((user) => (
+                          {dashboardUsers.slice(0, 5).map((user) => (
                             <tr key={user.id}>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.id}</td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.name}</td>

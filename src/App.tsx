@@ -5,6 +5,7 @@ import { UserTable } from "./components/UserTable";
 import { Dashboard } from "./components/Dashboard"; 
 import { columns as productColumns } from "./products-columns";
 import { columns as userColumns } from "./users-columns";
+import { User } from "./types/user.types";
 
 type ProductApiResponse = {
   products: any[];
@@ -13,7 +14,8 @@ type ProductApiResponse = {
   limit: number;
 };
 
-type User = {
+// Type expected by UserTable component from users-columns
+type UserTableUser = {
   id: string;
   name: string;
   email: string;
@@ -28,6 +30,17 @@ function App() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isUserFormOpen, setIsUserFormOpen] = useState(false);
+  const [formData, setFormData] = useState({
+    firstName: "",
+    lastName: "",
+    age: "",
+    gender: "",
+    email: "",
+    phone: "",
+    dateOfBirth: "",
+    role: ""
+  });
 
   // Fetch product data from DummyJSON API
   useEffect(() => {
@@ -40,49 +53,6 @@ function App() {
         }
         const data: ProductApiResponse = await response.json();
         setProducts(data.products);
-        
-        setUsers([
-          {
-            id: "1",
-            name: "John Doe",
-            email: "john.doe@example.com",
-            role: "admin",
-            status: "active",
-            createdAt: "2023-01-15T09:30:00Z",
-          },
-          {
-            id: "2",
-            name: "Jane Smith",
-            email: "jane.smith@example.com",
-            role: "user",
-            status: "active",
-            createdAt: "2023-02-20T14:22:00Z",
-          },
-          {
-            id: "3",
-            name: "Robert Johnson",
-            email: "robert.j@example.com",
-            role: "user",
-            status: "inactive",
-            createdAt: "2023-03-05T11:15:00Z",
-          },
-          {
-            id: "4",
-            name: "Emily Davis",
-            email: "emily.davis@example.com",
-            role: "manager",
-            status: "active",
-            createdAt: "2023-04-12T16:45:00Z",
-          },
-          {
-            id: "5",
-            name: "Michael Wilson",
-            email: "m.wilson@example.com",
-            role: "user",
-            status: "pending",
-            createdAt: "2023-05-08T10:20:00Z",
-          },
-        ]);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An error occurred');
       } finally {
@@ -92,6 +62,56 @@ function App() {
 
     fetchData();
   }, []);
+
+  // Transform users to match UserTable component's expected format
+  const transformUsersForUserTable = (users: User[]): UserTableUser[] => {
+    return users.map(user => ({
+      id: user.id,
+      name: `${user.firstName} ${user.lastName}`,
+      email: user.email,
+      role: user.role,
+      status: "active", // Default status
+      createdAt: user.dateOfBirth || new Date().toISOString()
+    }));
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Create new user object
+    const newUser: User = {
+      id: Date.now().toString(),
+      firstName: formData.firstName,
+      lastName: formData.lastName,
+      age: parseInt(formData.age),
+      gender: formData.gender,
+      email: formData.email,
+      phone: formData.phone,
+      dateOfBirth: formData.dateOfBirth,
+      role: formData.role
+    };
+    
+    // Add to users array
+    setUsers(prevUsers => [...prevUsers, newUser]);
+    
+    // Reset form and close popup
+    setFormData({
+      firstName: "",
+      lastName: "",
+      age: "",
+      gender: "",
+      email: "",
+      phone: "",
+      dateOfBirth: "",
+      role: ""
+    });
+    setIsUserFormOpen(false);
+  };
 
   if (loading) {
     return (
@@ -164,11 +184,168 @@ function App() {
           </div>
         ) : (
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold mb-6 text-gray-800 text-center">
-              Users
-            </h1>
+            <div className="flex justify-between items-center mb-6">
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-800">
+                Users
+              </h1>
+              <button 
+                onClick={() => setIsUserFormOpen(true)}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+              >
+                Add User
+              </button>
+            </div>
             <div className="bg-white rounded-lg shadow overflow-hidden border p-5 md:p-8">
-              <UserTable data={users} columns={userColumns} />
+              <UserTable data={transformUsersForUserTable(users)} columns={userColumns} />
+            </div>
+          </div>
+        )}
+        
+        {/* User Form Modal */}
+        {isUserFormOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold text-gray-800">Add New User</h2>
+                <button 
+                  onClick={() => setIsUserFormOpen(false)}
+                  className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
+                >
+                  &times;
+                </button>
+              </div>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      First Name
+                    </label>
+                    <input
+                      type="text"
+                      name="firstName"
+                      value={formData.firstName}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Last Name
+                    </label>
+                    <input
+                      type="text"
+                      name="lastName"
+                      value={formData.lastName}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Age
+                    </label>
+                    <input
+                      type="number"
+                      name="age"
+                      value={formData.age}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                      min="1"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Gender
+                    </label>
+                    <select
+                      name="gender"
+                      value={formData.gender}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    >
+                      <option value="">Select Gender</option>
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Phone
+                    </label>
+                    <input
+                      type="tel"
+                      name="phone"
+                      value={formData.phone}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Date of Birth
+                    </label>
+                    <input
+                      type="date"
+                      name="dateOfBirth"
+                      value={formData.dateOfBirth}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Role
+                    </label>
+                    <select
+                      name="role"
+                      value={formData.role}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    >
+                      <option value="">Select Role</option>
+                      <option value="admin">Admin</option>
+                      <option value="manager">Manager</option>
+                      <option value="user">User</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="flex justify-end space-x-3 mt-6">
+                  <button
+                    type="button"
+                    onClick={() => setIsUserFormOpen(false)}
+                    className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                  >
+                    Add User
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}
