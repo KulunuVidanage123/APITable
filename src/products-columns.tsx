@@ -14,6 +14,17 @@ export type Product = {
   thumbnail: string;
   images: string[];
   availabilityStatus: "In Stock" | "Low Stock" | "Out of Stock";
+  warrantyInformation?: string;
+  shippingInformation?: string;
+  returnPolicy?: string;
+  minimumOrderQuantity?: number;
+  reviews?: Array<{
+    rating: number;
+    comment: string;
+    date: string;
+    reviewerName: string;
+    reviewerEmail: string;
+  }>;
 };
 
 export const columns: ColumnDef<Product, unknown>[] = [
@@ -122,6 +133,65 @@ export const columns: ColumnDef<Product, unknown>[] = [
           ))}
           <span className="ml-1 text-sm text-gray-700">{rating.toFixed(1)}</span>
         </div>
+      );
+    },
+  },
+  {
+    id: "actions",
+    header: "Actions",
+    cell: ({ row }) => {
+      const product = row.original;
+
+      const handleView = () => {
+        let message = `--- Product Details ---\n`;
+        message += `ID: ${product.id}\n`;
+        message += `Title: ${product.title}\n`;
+        message += `Brand: ${product.brand || "N/A"}\n`;
+        message += `Category: ${product.category || "N/A"}\n`;
+        message += `Price: $${product.price.toFixed(2)}\n`;
+        if (product.discountPercentage > 0) {
+          message += `Discount: ${product.discountPercentage}%\n`;
+          const discounted = product.price * (1 - product.discountPercentage / 100);
+          message += `Discounted Price: $${discounted.toFixed(2)}\n`;
+        }
+        message += `Stock: ${product.stock} units\n`;
+        message += `Status: ${product.availabilityStatus}\n`;
+        message += `Rating: ${product.rating} / 5\n`;
+        message += `\nDescription:\n${product.description}\n`;
+        
+        if (product.warrantyInformation) {
+          message += `\nWarranty: ${product.warrantyInformation}\n`;
+        }
+        if (product.shippingInformation) {
+          message += `Shipping: ${product.shippingInformation}\n`;
+        }
+        if (product.returnPolicy) {
+          message += `Return Policy: ${product.returnPolicy}\n`;
+        }
+        if (product.minimumOrderQuantity) {
+          message += `Min Order Qty: ${product.minimumOrderQuantity}\n`;
+        }
+
+        if (product.reviews && product.reviews.length > 0) {
+          message += `\n--- Reviews (${product.reviews.length}) ---\n`;
+          product.reviews.forEach((review, i) => {
+            message += `\nReview ${i + 1}:\n`;
+            message += `  Rating: ${review.rating}/5\n`;
+            message += `  By: ${review.reviewerName}\n`;
+            message += `  Comment: "${review.comment}"\n`;
+          });
+        }
+
+        alert(message);
+      };
+
+      return (
+        <button
+          onClick={handleView}
+          className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md transition-colors"
+        >
+          View
+        </button>
       );
     },
   },
