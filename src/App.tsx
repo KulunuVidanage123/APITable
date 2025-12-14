@@ -1,10 +1,10 @@
 // src/App.tsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { DataTable } from "./components/ProductTable";
 import { UserTable } from "./components/UserTable";
 import { Dashboard } from "./components/Dashboard"; 
 import { columns as productColumns } from "./products-columns";
-import { getColumns as getUserColumns, User } from "./users-columns"; // Updated import
+import { getColumns as getUserColumns, User } from "./users-columns";
 
 type ProductApiResponse = {
   products: any[];
@@ -13,7 +13,6 @@ type ProductApiResponse = {
   limit: number;
 };
 
-// Load users from localStorage or use an empty array if none exists
 const loadUsersFromLocalStorage = (): User[] => {
   try {
     const storedUsers = localStorage.getItem('users');
@@ -40,7 +39,8 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isUserFormOpen, setIsUserFormOpen] = useState(false);
-  const [editingUserId, setEditingUserId] = useState<string | null>(null); // Track which user is being edited
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState(""); 
   
   const [formData, setFormData] = useState({
     firstName: "",
@@ -63,7 +63,6 @@ function App() {
     const fetchData = async () => {
       try {
         setLoading(true);
-        // ✅ FIXED: Removed extra spaces from URL
         const response = await fetch('https://dummyjson.com/products');
         if (!response.ok) {
           throw new Error('Failed to fetch products');
@@ -80,6 +79,14 @@ function App() {
     fetchData();
   }, []);
 
+  const filteredUsers = useMemo(() => {
+    if (!searchTerm.trim()) return users;
+    const term = searchTerm.toLowerCase();
+    return users.filter(user => 
+      user.firstName.toLowerCase().includes(term)
+    );
+  }, [users, searchTerm]);
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -89,7 +96,6 @@ function App() {
     e.preventDefault();
     
     if (editingUserId) {
-      // Update existing user
       setUsers(prevUsers => 
         prevUsers.map(user => 
           user.id === editingUserId 
@@ -108,7 +114,6 @@ function App() {
         )
       );
     } else {
-      // Create new user
       const newUser: User = {
         id: Date.now().toString(),
         firstName: formData.firstName,
@@ -124,7 +129,6 @@ function App() {
       setUsers(prevUsers => [...prevUsers, newUser]);
     }
     
-    // Reset form and close popup
     resetForm();
   };
 
@@ -143,15 +147,10 @@ function App() {
     setIsUserFormOpen(false);
   };
 
-  // Add a function to delete a user
   const handleDeleteUser = (userId: string) => {
-    setUsers(prevUsers => {
-      const updatedUsers = prevUsers.filter(user => user.id !== userId);
-      return updatedUsers;
-    });
+    setUsers(prevUsers => prevUsers.filter(user => user.id !== userId));
   };
 
-  // Add a function to edit a user
   const handleEditUser = (user: User) => {
     setEditingUserId(user.id);
     setFormData({
@@ -238,24 +237,34 @@ function App() {
           </div>
         ) : (
           <div>
-            <div className="flex justify-between items-center mb-6">
-              <h1 className="text-2xl md:text-3xl font-bold text-gray-800">
-                Users
-              </h1>
+            {/* Search bar + Add User button row */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Users</h1>
+              
+              <div className="w-full md:w-64">
+                <input
+                  type="text"
+                  placeholder="Search by first name..."
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+
               <button 
                 onClick={() => {
                   resetForm();
                   setIsUserFormOpen(true);
                 }}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors whitespace-nowrap"
               >
                 Add User
               </button>
             </div>
+
             <div className="bg-white rounded-lg shadow overflow-hidden border p-5 md:p-8">
-              {/* ✅ Use getUserColumns() with action handlers */}
               <UserTable 
-                data={users} 
+                data={filteredUsers} 
                 columns={getUserColumns(handleEditUser, handleDeleteUser)} 
               />
             </div>
@@ -414,7 +423,6 @@ function App() {
         )}
         
         <div className="mt-8 text-center text-gray-500 text-sm">
-          <p>Products data provided by DummyJSON API</p>
         </div>
       </div>
     </div>
