@@ -4,8 +4,7 @@ import { DataTable } from "./components/ProductTable";
 import { UserTable } from "./components/UserTable";
 import { Dashboard } from "./components/Dashboard"; 
 import { columns as productColumns } from "./products-columns";
-import { columns as userColumns } from "./users-columns";
-import { User } from "./types/user.types";
+import { getColumns as getUserColumns, User } from "./users-columns"; // Updated import
 
 type ProductApiResponse = {
   products: any[];
@@ -14,23 +13,35 @@ type ProductApiResponse = {
   limit: number;
 };
 
-// Type expected by UserTable component from users-columns
-type UserTableUser = {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-  status: "active" | "inactive" | "pending";
-  createdAt: string;
+// Load users from localStorage or use an empty array if none exists
+const loadUsersFromLocalStorage = (): User[] => {
+  try {
+    const storedUsers = localStorage.getItem('users');
+    return storedUsers ? JSON.parse(storedUsers) : [];
+  } catch (error) {
+    console.error('Error loading users from localStorage:', error);
+    return [];
+  }
+};
+
+// Save users to localStorage
+const saveUsersToLocalStorage = (users: User[]) => {
+  try {
+    localStorage.setItem('users', JSON.stringify(users));
+  } catch (error) {
+    console.error('Error saving users to localStorage:', error);
+  }
 };
 
 function App() {
   const [activeTab, setActiveTab] = useState("dashboard"); 
   const [products, setProducts] = useState<any[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<User[]>(loadUsersFromLocalStorage());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isUserFormOpen, setIsUserFormOpen] = useState(false);
+  const [editingUserId, setEditingUserId] = useState<string | null>(null); // Track which user is being edited
+  
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -42,11 +53,17 @@ function App() {
     role: ""
   });
 
+  // Save users to localStorage whenever they change
+  useEffect(() => {
+    saveUsersToLocalStorage(users);
+  }, [users]);
+
   // Fetch product data from DummyJSON API
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
+        // ✅ FIXED: Removed extra spaces from URL
         const response = await fetch('https://dummyjson.com/products');
         if (!response.ok) {
           throw new Error('Failed to fetch products');
@@ -63,18 +80,6 @@ function App() {
     fetchData();
   }, []);
 
-  // Transform users to match UserTable component's expected format
-  const transformUsersForUserTable = (users: User[]): UserTableUser[] => {
-    return users.map(user => ({
-      id: user.id,
-      name: `${user.firstName} ${user.lastName}`,
-      email: user.email,
-      role: user.role,
-      status: "active", // Default status
-      createdAt: user.dateOfBirth || new Date().toISOString()
-    }));
-  };
-
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -83,23 +88,47 @@ function App() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Create new user object
-    const newUser: User = {
-      id: Date.now().toString(),
-      firstName: formData.firstName,
-      lastName: formData.lastName,
-      age: parseInt(formData.age),
-      gender: formData.gender,
-      email: formData.email,
-      phone: formData.phone,
-      dateOfBirth: formData.dateOfBirth,
-      role: formData.role
-    };
-    
-    // Add to users array
-    setUsers(prevUsers => [...prevUsers, newUser]);
+    if (editingUserId) {
+      // Update existing user
+      setUsers(prevUsers => 
+        prevUsers.map(user => 
+          user.id === editingUserId 
+            ? { 
+                ...user, 
+                firstName: formData.firstName,
+                lastName: formData.lastName,
+                age: parseInt(formData.age),
+                gender: formData.gender,
+                email: formData.email,
+                phone: formData.phone,
+                dateOfBirth: formData.dateOfBirth,
+                role: formData.role
+              } 
+            : user
+        )
+      );
+    } else {
+      // Create new user
+      const newUser: User = {
+        id: Date.now().toString(),
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        age: parseInt(formData.age),
+        gender: formData.gender,
+        email: formData.email,
+        phone: formData.phone,
+        dateOfBirth: formData.dateOfBirth,
+        role: formData.role
+      };
+      
+      setUsers(prevUsers => [...prevUsers, newUser]);
+    }
     
     // Reset form and close popup
+    resetForm();
+  };
+
+  const resetForm = () => {
     setFormData({
       firstName: "",
       lastName: "",
@@ -110,7 +139,32 @@ function App() {
       dateOfBirth: "",
       role: ""
     });
+    setEditingUserId(null);
     setIsUserFormOpen(false);
+  };
+
+  // Add a function to delete a user
+  const handleDeleteUser = (userId: string) => {
+    setUsers(prevUsers => {
+      const updatedUsers = prevUsers.filter(user => user.id !== userId);
+      return updatedUsers;
+    });
+  };
+
+  // Add a function to edit a user
+  const handleEditUser = (user: User) => {
+    setEditingUserId(user.id);
+    setFormData({
+      firstName: user.firstName,
+      lastName: user.lastName,
+      age: user.age.toString(),
+      gender: user.gender,
+      email: user.email,
+      phone: user.phone,
+      dateOfBirth: user.dateOfBirth,
+      role: user.role
+    });
+    setIsUserFormOpen(true);
   };
 
   if (loading) {
@@ -189,14 +243,21 @@ function App() {
                 Users
               </h1>
               <button 
-                onClick={() => setIsUserFormOpen(true)}
+                onClick={() => {
+                  resetForm();
+                  setIsUserFormOpen(true);
+                }}
                 className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
               >
                 Add User
               </button>
             </div>
             <div className="bg-white rounded-lg shadow overflow-hidden border p-5 md:p-8">
-              <UserTable data={transformUsersForUserTable(users)} columns={userColumns} />
+              {/* ✅ Use getUserColumns() with action handlers */}
+              <UserTable 
+                data={users} 
+                columns={getUserColumns(handleEditUser, handleDeleteUser)} 
+              />
             </div>
           </div>
         )}
@@ -206,9 +267,11 @@ function App() {
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold text-gray-800">Add New User</h2>
+                <h2 className="text-xl font-bold text-gray-800">
+                  {editingUserId ? "Edit User" : "Add New User"}
+                </h2>
                 <button 
-                  onClick={() => setIsUserFormOpen(false)}
+                  onClick={resetForm}
                   className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
                 >
                   &times;
@@ -333,7 +396,7 @@ function App() {
                 <div className="flex justify-end space-x-3 mt-6">
                   <button
                     type="button"
-                    onClick={() => setIsUserFormOpen(false)}
+                    onClick={resetForm}
                     className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
                   >
                     Cancel
@@ -342,7 +405,7 @@ function App() {
                     type="submit"
                     className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
                   >
-                    Add User
+                    {editingUserId ? "Update User" : "Add User"}
                   </button>
                 </div>
               </form>

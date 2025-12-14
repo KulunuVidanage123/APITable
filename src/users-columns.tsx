@@ -1,6 +1,7 @@
 // src/users-columns.tsx
-import { ColumnDef } from "@tanstack/react-table";
+import { ColumnDef, CellContext } from "@tanstack/react-table";
 import { ArrowUpDown } from "lucide-react";
+import React from "react";
 
 const Badge = ({ variant = "default", children, className = "" }: {
   variant?: "default" | "secondary" | "destructive" | "success" | "warning";
@@ -21,6 +22,7 @@ const Badge = ({ variant = "default", children, className = "" }: {
     </span>
   );
 };
+
 const Button = ({ 
   onClick, 
   children, 
@@ -43,22 +45,54 @@ const Button = ({
 
 export type User = {
   id: string;
-  name: string;
+  firstName: string;
+  lastName: string;
+  age: number;
+  gender: string;
   email: string;
+  phone: string;
+  dateOfBirth: string;
   role: string;
-  status: "active" | "inactive" | "pending";
-  createdAt: string;
 };
 
-export const columns: ColumnDef<User, unknown>[] = [
+export const getColumns = (
+  onEditUser?: (user: User) => void,
+  onDeleteUser?: (userId: string) => void
+): ColumnDef<User, unknown>[] => [
   {
-    accessorKey: "name",
+    accessorKey: "firstName",
     header: ({ column }) => (
       <Button onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
-        Name
+        First Name
         <ArrowUpDown className="ml-1 h-3 w-3" />
       </Button>
     ),
+  },
+  {
+    accessorKey: "lastName",
+    header: ({ column }) => (
+      <Button onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
+        Last Name
+        <ArrowUpDown className="ml-1 h-3 w-3" />
+      </Button>
+    ),
+  },
+  {
+    accessorKey: "age",
+    header: ({ column }) => (
+      <Button onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
+        Age
+        <ArrowUpDown className="ml-1 h-3 w-3" />
+      </Button>
+    ),
+  },
+  {
+    accessorKey: "gender",
+    header: "Gender",
+    cell: ({ getValue }: CellContext<User, unknown>) => {
+      const gender = getValue() as string;
+      return <span className="capitalize">{gender}</span>;
+    },
   },
   {
     accessorKey: "email",
@@ -70,36 +104,85 @@ export const columns: ColumnDef<User, unknown>[] = [
     ),
   },
   {
-    accessorKey: "role",
-    header: "Role",
-    cell: ({ row }) => {
-      const role = row.getValue("role") as string;
-      const variant = role === "admin" ? "destructive" : "secondary";
-      return <Badge variant={variant} className="capitalize">{role}</Badge>;
-    },
-  },
-  {
-    accessorKey: "status",
-    header: "Status",
-    cell: ({ row }) => {
-      const status = row.getValue("status") as string;
-      let variant: "success" | "secondary" | "warning" = "secondary";
-      if (status === "active") variant = "success";
-      else if (status === "pending") variant = "warning";
-      return <Badge variant={variant} className="capitalize">{status}</Badge>;
-    },
-  },
-  {
-    accessorKey: "createdAt",
+    accessorKey: "phone",
     header: ({ column }) => (
       <Button onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
-        Created
+        Phone
         <ArrowUpDown className="ml-1 h-3 w-3" />
       </Button>
     ),
-    cell: ({ row }) => {
-      const date = new Date(row.getValue("createdAt") as string);
+  },
+  {
+    accessorKey: "dateOfBirth",
+    header: ({ column }) => (
+      <Button onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
+        Date of Birth
+        <ArrowUpDown className="ml-1 h-3 w-3" />
+      </Button>
+    ),
+    cell: ({ getValue }: CellContext<User, unknown>) => {
+      const date = new Date(getValue() as string);
       return date.toLocaleDateString();
     },
   },
+  {
+    accessorKey: "role",
+    header: "Role",
+    cell: ({ getValue }: CellContext<User, unknown>) => {
+      const role = getValue() as string;
+      const variant = 
+        role.toLowerCase() === "admin" ? "destructive" : 
+        role.toLowerCase() === "manager" ? "warning" : 
+        "secondary";
+      return <Badge variant={variant} className="capitalize">{role}</Badge>;
+    },
+  },
+  ...(onEditUser || onDeleteUser ? [{
+    id: "actions",
+    header: () => (
+      <div className="text-center w-full">Actions</div>
+    ),
+    cell: ({ row }: CellContext<User, unknown>) => {
+      const user = row.original;
+      
+      const handleEdit = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        e.preventDefault();
+        if (onEditUser) {
+          onEditUser(user);
+        }
+      };
+      
+      const handleDelete = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        e.preventDefault();
+        if (onDeleteUser && window.confirm("Are you sure you want to delete this user?")) {
+          onDeleteUser(user.id);
+        }
+      };
+      
+      return (
+        <div className="flex justify-center gap-2 min-w-[100px]">
+          {onEditUser && (
+            <button 
+              onClick={handleEdit} 
+              className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white text-sm rounded transition-colors"
+              aria-label="Edit user"
+            >
+              Edit
+            </button>
+          )}
+          {onDeleteUser && (
+            <button 
+              onClick={handleDelete} 
+              className="px-3 py-1 bg-red-500 hover:bg-red-600 text-white text-sm rounded transition-colors"
+              aria-label="Delete user"
+            >
+              Delete
+            </button>
+          )}
+        </div>
+      );
+    },
+  }] : []),
 ];
