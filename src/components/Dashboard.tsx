@@ -1,7 +1,7 @@
 // src/components/Dashboard.tsx
 import React, { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import { Button } from "./ui/button";
+import { Product, User } from '../../types';
+
 import { 
   BarChart, 
   Bar, 
@@ -11,62 +11,7 @@ import {
   Tooltip, 
   ResponsiveContainer 
 } from "recharts";
-import { ArrowUpRight, ArrowDownRight, Users, ShoppingCart, Package, DollarSign } from "lucide-react";
 
-interface Product {
-  id: number;
-  title: string;
-  description: string;
-  price: number;
-  discountPercentage: number;
-  rating: number;
-  stock: number;
-  brand: string;
-  category: string;
-  thumbnail: string;
-  images: string[];
-  availabilityStatus: string;
-  warrantyInformation: string;
-  shippingInformation: string;
-  reviews: Array<{
-    rating: number;
-    comment: string;
-    date: string;
-    reviewerName: string;
-    reviewerEmail: string;
-  }>;
-  returnPolicy: string;
-  minimumOrderQuantity: number;
-  meta: {
-    createdAt: string;
-    updatedAt: string;
-    barcode: string;
-    qrCode: string;
-  };
-  dimensions: {
-    width: number;
-    height: number;
-    depth: number;
-  };
-  tags: string[];
-  sku: string;
-  weight: number;
-}
-
-// Updated User interface to match the structure from App.tsx
-interface User {
-  id: string;
-  firstName: string;
-  lastName: string;
-  age: number;
-  gender: string;
-  email: string;
-  phone: string;
-  dateOfBirth: string;
-  role: string;
-}
-
-// Interface for Dashboard's internal user representation
 interface DashboardUser {
   id: string;
   name: string;
@@ -82,83 +27,120 @@ interface DashboardProps {
   setActiveTab?: React.Dispatch<React.SetStateAction<string>>;
 }
 
-// Stats card props
+const Card = ({ children, className = "" }: { children: React.ReactNode; className?: string }) => (
+  <div className={`bg-white rounded-lg border shadow-sm ${className}`}>{children}</div>
+);
+const CardHeader = ({ children, className = "" }: { children: React.ReactNode; className?: string }) => (
+  <div className={`p-6 pb-4 ${className}`}>{children}</div>
+);
+const CardContent = ({ children, className = "" }: { children: React.ReactNode; className?: string }) => (
+  <div className={`p-6 pt-0 ${className}`}>{children}</div>
+);
+const CardTitle = ({ children, className = "" }: { children: React.ReactNode; className?: string }) => (
+  <h3 className={`text-lg font-semibold ${className}`}>{children}</h3>
+);
+const Button = ({ 
+  children, 
+  variant = "default", 
+  onClick,
+  className = "",
+  ...props
+}: { 
+  children: React.ReactNode; 
+  variant?: string; 
+  onClick?: () => void;
+  className?: string;
+  [key: string]: any;
+}) => (
+  <button
+    onClick={onClick}
+    className={`
+      px-4 py-2 text-sm font-medium rounded-md transition-colors
+      ${variant === "outline" 
+        ? "border border-gray-300 text-gray-700 hover:bg-gray-50" 
+        : "bg-blue-600 text-white hover:bg-blue-700"}
+      ${className}
+    `}
+    {...props}
+  >
+    {children}
+  </button>
+);
+
 interface StatCardProps {
   title: string;
   value: string;
-  icon: React.ElementType;
   trend: number;
   description: string;
 }
-
-const StatCard = ({ title, value, icon: Icon, trend, description }: StatCardProps) => {
+const StatCard = ({ title, value, trend, description }: StatCardProps) => {
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+      <CardHeader className="pb-2">
         <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <Icon className="h-4 w-4 text-muted-foreground" />
       </CardHeader>
       <CardContent>
         <div className="text-2xl font-bold">{value}</div>
-        <div className="flex items-center pt-2">
-          <span className={`text-xs font-medium ${
-            trend > 0 ? "text-green-500" : "text-red-500"
-          }`}>
-            {trend > 0 ? (
-              <ArrowUpRight className="h-4 w-4 inline mr-1" />
-            ) : (
-              <ArrowDownRight className="h-4 w-4 inline mr-1" />
-            )}
-            {Math.abs(trend)}%
+        <div className="flex items-center pt-2 text-xs">
+          <span className={trend > 0 ? "text-green-600" : "text-red-600"}>
+            {trend > 0 ? '↗' : '↘'} {Math.abs(trend)}%
           </span>
-          <span className="text-xs text-muted-foreground ml-2">{description}</span>
+          <span className="text-gray-500 ml-2">{description}</span>
         </div>
       </CardContent>
     </Card>
   );
 };
 
-const salesData = [
-  { name: "Jan", sales: 4000 },
-  { name: "Feb", sales: 3000 },
-  { name: "Mar", sales: 5000 },
-  { name: "Apr", sales: 4500 },
-  { name: "May", sales: 6000 },
-  { name: "Jun", sales: 7000 },
-];
-
-// Transform users from the new format to what Dashboard expects
 const transformUsersForDashboard = (users: User[]): DashboardUser[] => {
   return users.map(user => ({
     id: user.id,
     name: `${user.firstName} ${user.lastName}`,
     email: user.email,
     role: user.role,
-    status: "active", // Default status since we don't have this field anymore
-    createdAt: user.dateOfBirth || new Date().toISOString()
+    status: "active",
+    createdAt: user.dateOfBirth || new Date().toISOString(),
   }));
 };
 
-export function Dashboard({ products: propProducts, users: propUsers = [], setActiveTab: propSetActiveTab }: DashboardProps) {
-  const [activeTab, setActiveTab] = useState(propSetActiveTab ? "products" : "products");
+const getSalesDataByCategory = (products: Product[]) => {
+  const categoryMap: Record<string, number> = {};
+  
+  products.forEach(product => {
+    const revenue = product.price * product.stock;
+    categoryMap[product.category] = (categoryMap[product.category] || 0) + revenue;
+  });
+
+  return Object.entries(categoryMap)
+    .map(([name, sales]) => ({ name, sales: Math.round(sales) }))
+    .sort((a, b) => b.sales - a.sales)
+    .slice(0, 6); 
+};
+
+export function Dashboard({ 
+  products: propProducts, 
+  users: propUsers = [], 
+  setActiveTab: propSetActiveTab 
+}: DashboardProps) {
+  const [activeTab, setActiveTab] = useState("products");
   const [dashboardData, setDashboardData] = useState({
-    totalRevenue: "$12,345",
-    totalUsers: "1,258",
-    totalProducts: "246",
-    totalOrders: "321",
-    revenueTrend: 12.5,
-    usersTrend: 8.2,
-    productsTrend: 3.7,
-    ordersTrend: 5.4
+    totalRevenue: "$0.00",
+    totalUsers: "0",
+    totalProducts: "0",
+    totalOrders: "0",
+    revenueTrend: 0,
+    usersTrend: 0,
+    productsTrend: 0,
+    ordersTrend: 0,
   });
   
   const [products, setProducts] = useState<Product[]>(propProducts || []);
-  const [dashboardUsers, setDashboardUsers] = useState<DashboardUser[]>(transformUsersForDashboard(propUsers));
+  const [dashboardUsers, setDashboardUsers] = useState<DashboardUser[]>(
+    transformUsersForDashboard(propUsers)
+  );
   const [loading, setLoading] = useState(!propProducts);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Update dashboard users when propUsers changes
     setDashboardUsers(transformUsersForDashboard(propUsers));
     setDashboardData(prev => ({
       ...prev,
@@ -167,85 +149,49 @@ export function Dashboard({ products: propProducts, users: propUsers = [], setAc
   }, [propUsers]);
 
   useEffect(() => {
-    if (propProducts) return;
+    if (propProducts) {
+      const totalRevenue = propProducts.reduce(
+        (sum, product) => sum + product.price * product.stock,
+        0
+      ).toFixed(2);
+      setDashboardData(prev => ({
+        ...prev,
+        totalProducts: propProducts.length.toString(),
+        totalRevenue: `$${totalRevenue}`,
+      }));
+      setProducts(propProducts);
+      return;
+    }
 
     const fetchProducts = async () => {
       try {
         setLoading(true);
-        setError(null);
-        
         const response = await fetch('https://dummyjson.com/products');
-        if (!response.ok) {
-          throw new Error('Failed to fetch products');
-        }
-        const result = await response.json();
+        if (!response.ok) throw new Error('Failed to fetch products');
+        const  { products: fetchedProducts } = await response.json();
         
+        const totalRevenue = fetchedProducts.reduce(
+          (sum: number, product: Product) => sum + product.price * product.stock,
+          0
+        ).toFixed(2);
+
         setDashboardData(prev => ({
           ...prev,
-          totalProducts: result.products.length.toString(),
-          totalRevenue: `$${(result.products.reduce((sum: number, product: Product) => sum + product.price * 100, 0) / 100).toFixed(2)}`,
+          totalProducts: fetchedProducts.length.toString(),
+          totalRevenue: `$${totalRevenue}`,
+          totalUsers: propUsers.length.toString(),
         }));
-        
-        setProducts(result.products);
-      } catch (error) {
-        console.error('Error fetching products:', error);
-        setError('Failed to load product data. Using sample data instead.');
-        
-        setProducts([
-          {
-            id: 1,
-            title: "iPhone 9",
-            description: "An apple mobile which is nothing like apple",
-            price: 549,
-            discountPercentage: 12.96,
-            rating: 4.69,
-            stock: 94,
-            brand: "Apple",
-            category: "smartphones",
-            thumbnail: "https://i.dummyjson.com/data/products/1/thumbnail.jpg",
-            images: [
-              "https://i.dummyjson.com/data/products/1/1.jpg",
-              "https://i.dummyjson.com/data/products/1/2.jpg"
-            ],
-            availabilityStatus: "In Stock",
-            warrantyInformation: "1 year warranty",
-            shippingInformation: "Ships in 1 week",
-            reviews: [],
-            returnPolicy: "30 days return policy",
-            minimumOrderQuantity: 1,
-            meta: {
-              createdAt: "2023-01-01T00:00:00.000Z",
-              updatedAt: "2023-01-01T00:00:00.000Z",
-              barcode: "1234567890",
-              qrCode: "https://example.com/qrcode.png"
-            },
-            dimensions: {
-              width: 10,
-              height: 10,
-              depth: 10
-            },
-            tags: ["smartphones", "apple"],
-            sku: "IPHONE-9",
-            weight: 1
-          }
-        ]);
+        setProducts(fetchedProducts);
+      } catch (err) {
+        console.error('Error fetching products:', err);
+        setProducts([]);
       } finally {
         setLoading(false);
       }
     };
 
     fetchProducts();
-
-    const timer = setTimeout(() => {
-      setDashboardData(prev => ({
-        ...prev,
-        totalRevenue: "$12,432",
-        revenueTrend: 13.2
-      }));
-    }, 2000);
-    
-    return () => clearTimeout(timer);
-  }, [propProducts]);
+  }, [propProducts, propUsers]);
 
   const handleTabChange = (tab: string) => {
     if (propSetActiveTab) {
@@ -263,66 +209,46 @@ export function Dashboard({ products: propProducts, users: propUsers = [], setAc
     );
   }
 
-  if (error) {
-    console.warn("Dashboard warning:", error);
-  }
+  const salesData = getSalesDataByCategory(products);
 
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
             <p className="text-gray-500 text-sm">Analytics and data overview</p>
           </div>
-          <div className="flex items-center space-x-4">
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Search..."
-                className="pl-10 pr-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                </svg>
-              </div>
-            </div>
-            <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-medium">
-              A
-            </div>
+          <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-medium">
+            A
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 py-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <StatCard 
             title="Total Revenue" 
             value={dashboardData.totalRevenue} 
-            icon={DollarSign} 
-            trend={dashboardData.revenueTrend} 
+            trend={12.5} 
             description="from last month" 
           />
           <StatCard 
             title="Total Users" 
             value={dashboardData.totalUsers} 
-            icon={Users} 
-            trend={dashboardData.usersTrend} 
+            trend={8.2} 
             description="new users" 
           />
           <StatCard 
             title="Products" 
             value={dashboardData.totalProducts} 
-            icon={Package} 
-            trend={dashboardData.productsTrend} 
+            trend={3.7} 
             description="in inventory" 
           />
           <StatCard 
             title="Orders" 
             value={dashboardData.totalOrders} 
-            icon={ShoppingCart} 
-            trend={dashboardData.ordersTrend} 
+            trend={5.4} 
             description="this month" 
           />
         </div>
@@ -335,37 +261,46 @@ export function Dashboard({ products: propProducts, users: propUsers = [], setAc
               </CardHeader>
               <CardContent>
                 <div className="h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={salesData}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis 
-                        dataKey="name" 
-                        axisLine={false} 
-                        tickLine={false} 
-                        tick={{ fill: "#6b7280", fontSize: 12 }}
-                      />
-                      <YAxis 
-                        axisLine={false} 
-                        tickLine={false} 
-                        tick={{ fill: "#6b7280", fontSize: 12 }} 
-                        width={30}
-                      />
-                      <Tooltip 
-                        contentStyle={{ 
-                          backgroundColor: "white", 
-                          border: "1px solid #e5e7eb",
-                          borderRadius: "0.375rem",
-                          boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)"
-                        }} 
-                      />
-                      <Bar 
-                        dataKey="sales" 
-                        fill="#3b82f6" 
-                        radius={[4, 4, 0, 0]}
-                        barSize={32}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  {salesData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={salesData}
+                        margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                        <XAxis 
+                          dataKey="name" 
+                          angle={-45} 
+                          textAnchor="end" 
+                          height={60}
+                          tick={{ fontSize: 12, fill: "#6b7280" }}
+                        />
+                        <YAxis 
+                          tickFormatter={(value) => `$${(value / 1000).toFixed(1)}k`}
+                          tick={{ fontSize: 12, fill: "#6b7280" }}
+                        />
+                        <Tooltip 
+                          formatter={(value) => [`$${Number(value).toLocaleString()}`, 'Revenue']}
+                          labelFormatter={(name) => `Category: ${name}`}
+                          contentStyle={{
+                            backgroundColor: 'white',
+                            border: '1px solid #e5e7eb',
+                            borderRadius: '0.375rem',
+                            boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
+                          }}
+                        />
+                        <Bar 
+                          dataKey="sales" 
+                          fill="#3b82f6" 
+                          radius={[4, 4, 0, 0]}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-full flex items-center justify-center text-gray-500">
+                      No product data available
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -377,30 +312,14 @@ export function Dashboard({ products: propProducts, users: propUsers = [], setAc
                 <CardTitle>Recent Activity</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-6">
-                  {[1, 2, 3].map((item) => (
-                    <div key={item} className="flex items-start">
-                      <div className="flex-shrink-0 h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
-                        <span className="text-blue-600 font-medium text-sm">
-                          {item === 1 ? "N" : item === 2 ? "J" : "S"}
-                        </span>
-                      </div>
-                      <div className="ml-4">
-                        <p className="text-sm font-medium text-gray-900">
-                          {item === 1 ? "New user registered" : 
-                           item === 2 ? "Order placed" : "Product added"}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {item === 1 ? "2 minutes ago" : 
-                           item === 2 ? "15 minutes ago" : "1 hour ago"}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                  <Button variant="outline" className="w-full mt-4">
-                    View All Activity
-                  </Button>
+                <div className="space-y-4 text-sm text-gray-600">
+                  <div>New user registered — 2 min ago</div>
+                  <div>Order placed — 15 min ago</div>
+                  <div>Product added — 1 hr ago</div>
                 </div>
+                <Button variant="outline" className="w-full mt-4">
+                  View All Activity
+                </Button>
               </CardContent>
             </Card>
           </div>
@@ -427,55 +346,49 @@ export function Dashboard({ products: propProducts, users: propUsers = [], setAc
               <CardContent>
                 {activeTab === "products" ? (
                   <div className="overflow-x-auto">
-                    <p className="text-sm text-gray-500 mb-4">Note: Product table columns need to be implemented.</p>
-                    <div className="border rounded-lg">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Title</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Price</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Stock</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {products.slice(0, 5).map((product) => (
+                          <tr key={product.id}>
+                            <td className="px-4 py-2 whitespace-nowrap text-sm">{product.id}</td>
+                            <td className="px-4 py-2 whitespace-nowrap text-sm">{product.title}</td>
+                            <td className="px-4 py-2 whitespace-nowrap text-sm">${product.price.toFixed(2)}</td>
+                            <td className="px-4 py-2 whitespace-nowrap text-sm">{product.stock}</td>
                           </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {products.slice(0, 5).map((product) => (
-                            <tr key={product.id}>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{product.id}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{product.title}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${product.price.toFixed(2)}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{product.stock}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
-                    <p className="text-sm text-gray-500 mb-4">Note: User table columns need to be implemented.</p>
-                    <div className="border rounded-lg">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {dashboardUsers.slice(0, 5).map((user) => (
+                          <tr key={user.id}>
+                            <td className="px-4 py-2 whitespace-nowrap text-sm">{user.id}</td>
+                            <td className="px-4 py-2 whitespace-nowrap text-sm">{user.name}</td>
+                            <td className="px-4 py-2 whitespace-nowrap text-sm">{user.email}</td>
+                            <td className="px-4 py-2 whitespace-nowrap text-sm">{user.role}</td>
                           </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {dashboardUsers.slice(0, 5).map((user) => (
-                            <tr key={user.id}>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.id}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.name}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.email}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.role}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 )}
               </CardContent>
