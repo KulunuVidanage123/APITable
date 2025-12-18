@@ -4,7 +4,7 @@ import { ShadcnTable } from './components/ShadcnTable';
 import { Dashboard } from './components/Dashboard';
 import { getColumns as getUserColumns } from './users-columns';
 import { productColumns } from './products-columns';
-import { Product, User } from '../types'; 
+import { Product, User } from '../types';
 
 type ProductApiResponse = {
   products: Product[];
@@ -13,27 +13,12 @@ type ProductApiResponse = {
   limit: number;
 };
 
-const loadUsersFromLocalStorage = (): User[] => {
-  try {
-    const storedUsers = localStorage.getItem('users');
-    return storedUsers ? JSON.parse(storedUsers) : [];
-  } catch (error) {
-    console.error('Error loading users from localStorage:', error);
-    return [];
-  }
-};
+const API_BASE_URL = 'http://localhost:3000/api';
 
-const saveUsersToLocalStorage = (users: User[]) => {
-  try {
-    localStorage.setItem('users', JSON.stringify(users));
-  } catch (error) {
-    console.error('Error saving users to localStorage:', error);
-  }
-};
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [products, setProducts] = useState<Product[]>([]);
-  const [users, setUsers] = useState<User[]>(loadUsersFromLocalStorage());
+  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isUserFormOpen, setIsUserFormOpen] = useState(false);
@@ -51,28 +36,58 @@ function App() {
     role: '',
   });
 
-  useEffect(() => {
-    saveUsersToLocalStorage(users);
-  }, [users]);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const response = await fetch('https://dummyjson.com/products');
-        if (!response.ok) {
-          throw new Error('Failed to fetch products');
-        }
-        const data: ProductApiResponse = await response.json();
-        setProducts(data.products);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred');
-      } finally {
-        setLoading(false);
+  // Fetch users from backend on mount or when needed
+  const fetchUsers = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/user`);
+      if (!response.ok) throw new Error('Failed to fetch users');
+      
+      const result = await response.json();
+      
+      // ✅ Extract the 'data' array
+      if (!Array.isArray(result.data)) {
+        throw new Error('Invalid response format: data is not an array');
       }
-    };
 
-    fetchData();
+      // ✅ Normalize backend fields to match frontend User type
+      const normalizedUsers = result.data.map((user: any) => ({
+        id: user._id, // Map _id → id
+        firstName: user.firstName,
+        lastName: user.lastName,
+        age: user.age,
+        gender: user.gender || '', 
+        email: user.email,
+        phone: user.phone || '',
+        dateOfBirth: user.dateOfBirth || '',
+        role: user.role || 'user',
+      }));
+
+      setUsers(normalizedUsers);
+    } catch (err) {
+      console.error('Error fetching users:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load users');
+    }
+  };
+
+  const fetchProducts = async () => {
+    try {
+      const response = await fetch('https://dummyjson.com/products');
+      if (!response.ok) throw new Error('Failed to fetch products');
+      const data: ProductApiResponse = await response.json();
+      setProducts(data.products);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    }
+  };
+
+  // Initial data load
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      await Promise.all([fetchProducts(), fetchUsers()]);
+      setLoading(false);
+    };
+    loadData();
   }, []);
 
   const filteredUsers = useMemo(() => {
@@ -88,44 +103,49 @@ function App() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (editingUserId) {
-      setUsers((prevUsers) =>
-        prevUsers.map((user) =>
-          user.id === editingUserId
-            ? {
-                ...user,
-                firstName: formData.firstName,
-                lastName: formData.lastName,
-                age: parseInt(formData.age),
-                gender: formData.gender,
-                email: formData.email,
-                phone: formData.phone,
-                dateOfBirth: formData.dateOfBirth,
-                role: formData.role,
-              }
-            : user
-        )
-      );
-    } else {
-      const newUser: User = {
-        id: Date.now().toString(),
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        age: parseInt(formData.age),
-        gender: formData.gender,
-        email: formData.email,
-        phone: formData.phone,
-        dateOfBirth: formData.dateOfBirth,
-        role: formData.role,
-      };
+    const payload = {
+      firstName: formData.firstName,
+      lastName: formData.lastName,
+      age: parseInt(formData.age, 10),
+      gender: formData.gender,
+      email: formData.email,
+      phone: formData.phone,
+      dateOfBirth: formData.dateOfBirth,
+      role: formData.role,
+    };
 
-      setUsers((prevUsers) => [...prevUsers, newUser]);
+    try {
+      if (editingUserId) {
+        // Update existing user
+        const response = await fetch(`${API_BASE_URL}/user/${editingUserId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!response.ok) throw new Error('Failed to update user');
+      } else {
+        // Create new user
+        const response = await fetch(`${API_BASE_URL}/user/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to create user');
+        }
+      }
+
+      // Refresh user list
+      await fetchUsers();
+      resetForm();
+    } catch (err) {
+      console.error('Submission error:', err);
+      alert(err instanceof Error ? err.message : 'Operation failed');
     }
-
-    resetForm();
   };
 
   const resetForm = () => {
@@ -143,8 +163,19 @@ function App() {
     setIsUserFormOpen(false);
   };
 
-  const handleDeleteUser = (userId: string) => {
-    setUsers((prevUsers) => prevUsers.filter((user) => user.id !== userId));
+  const handleDeleteUser = async (userId: string) => {
+    if (!confirm('Are you sure you want to delete this user?')) return;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/user/${userId}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) throw new Error('Failed to delete user');
+      await fetchUsers(); // Refresh list
+    } catch (err) {
+      console.error('Delete error:', err);
+      alert(err instanceof Error ? err.message : 'Delete failed');
+    }
   };
 
   const handleEditUser = (user: User) => {

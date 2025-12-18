@@ -1,4 +1,5 @@
-export type User = {
+// types.ts
+export interface User {
   id: string;
   firstName: string;
   lastName: string;
@@ -8,4 +9,4 @@ export type User = {
   phone: string;
   dateOfBirth: string;
   role: string;
-};
+}
