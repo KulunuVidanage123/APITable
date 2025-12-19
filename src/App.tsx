@@ -5,6 +5,7 @@ import { Dashboard } from './components/Dashboard';
 import { getColumns as getUserColumns } from './users-columns';
 import { productColumns } from './products-columns';
 import { Product, User } from '../types';
+import toast from 'react-hot-toast'; 
 
 type ProductApiResponse = {
   products: Product[];
@@ -20,7 +21,6 @@ function App() {
   const [products, setProducts] = useState<Product[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [isUserFormOpen, setIsUserFormOpen] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -36,26 +36,25 @@ function App() {
     role: '',
   });
 
-  // Fetch users from backend on mount or when needed
   const fetchUsers = async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/user`);
-      if (!response.ok) throw new Error('Failed to fetch users');
-      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to fetch users');
+      }
+
       const result = await response.json();
-      
-      // ✅ Extract the 'data' array
       if (!Array.isArray(result.data)) {
         throw new Error('Invalid response format: data is not an array');
       }
 
-      // ✅ Normalize backend fields to match frontend User type
       const normalizedUsers = result.data.map((user: any) => ({
-        id: user._id, // Map _id → id
+        id: user._id,
         firstName: user.firstName,
         lastName: user.lastName,
         age: user.age,
-        gender: user.gender || '', 
+        gender: user.gender || '',
         email: user.email,
         phone: user.phone || '',
         dateOfBirth: user.dateOfBirth || '',
@@ -65,22 +64,23 @@ function App() {
       setUsers(normalizedUsers);
     } catch (err) {
       console.error('Error fetching users:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load users');
+      toast.error(err instanceof Error ? err.message : 'Failed to load users');
     }
   };
 
   const fetchProducts = async () => {
     try {
+      // ✅ Removed extra spaces in URL
       const response = await fetch('https://dummyjson.com/products');
       if (!response.ok) throw new Error('Failed to fetch products');
       const data: ProductApiResponse = await response.json();
       setProducts(data.products);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      console.error('Error fetching products:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to load products');
     }
   };
 
-  // Initial data load
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
@@ -119,15 +119,17 @@ function App() {
 
     try {
       if (editingUserId) {
-        // Update existing user
         const response = await fetch(`${API_BASE_URL}/user/${editingUserId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
-        if (!response.ok) throw new Error('Failed to update user');
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to update user');
+        }
+        toast.success('User updated successfully!');
       } else {
-        // Create new user
         const response = await fetch(`${API_BASE_URL}/user/register`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -137,14 +139,14 @@ function App() {
           const errorData = await response.json();
           throw new Error(errorData.message || 'Failed to create user');
         }
+        toast.success('User added successfully!');
       }
 
-      // Refresh user list
       await fetchUsers();
       resetForm();
     } catch (err) {
       console.error('Submission error:', err);
-      alert(err instanceof Error ? err.message : 'Operation failed');
+      toast.error(err instanceof Error ? err.message : 'Operation failed');
     }
   };
 
@@ -170,11 +172,15 @@ function App() {
       const response = await fetch(`${API_BASE_URL}/user/${userId}`, {
         method: 'DELETE',
       });
-      if (!response.ok) throw new Error('Failed to delete user');
-      await fetchUsers(); // Refresh list
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to delete user');
+      }
+      await fetchUsers();
+      toast.success('User deleted successfully!');
     } catch (err) {
       console.error('Delete error:', err);
-      alert(err instanceof Error ? err.message : 'Delete failed');
+      toast.error(err instanceof Error ? err.message : 'Delete failed');
     }
   };
 
@@ -201,15 +207,7 @@ function App() {
     );
   }
 
-  if (error) {
-    return (
-      <div className="max-w-6xl mx-auto p-6">
-        <div className="bg-red-50 text-red-700 p-4 rounded-lg">
-          Error: {error}
-        </div>
-      </div>
-    );
-  }
+  // Removed global error UI — toasts handle all feedback
 
   return (
     <div className="min-h-screen bg-gray-100 p-4 md:p-8">
