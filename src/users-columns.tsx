@@ -1,8 +1,7 @@
 // src/users-columns.tsx
 import React from 'react';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Eye, Pencil, Trash2 } from 'lucide-react';
 
-// --- Reusable UI Components ---
 const Badge = ({
   variant = 'default',
   children,
@@ -51,6 +50,7 @@ export type UserColumn = {
 };
 
 export const getColumns = (
+  onViewUser?: (user: User) => void,
   onEditUser?: (user: User) => void,
   onDeleteUser?: (userId: string) => void
 ): UserColumn[] => {
@@ -117,10 +117,10 @@ export const getColumns = (
     },
   ];
 
-  if (onEditUser || onDeleteUser) {
+  if (onViewUser || onEditUser || onDeleteUser) {
     columns.push({
       key: 'actions',
-      header: '', 
+      header: '',
       render: (user) => {
         const handleDelete = () => {
           if (
@@ -133,6 +133,18 @@ export const getColumns = (
 
         return (
           <div className="flex items-center justify-end gap-2">
+            {onViewUser && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onViewUser(user);
+                }}
+                className="p-1.5 text-gray-600 hover:bg-gray-50 rounded-md transition-colors"
+                aria-label="View user"
+              >
+                <Eye size={16} />
+              </button>
+            )}
             {onEditUser && (
               <button
                 onClick={(e) => {

@@ -1,6 +1,5 @@
 // src/products-columns.tsx
-// import React from 'react';
-import { Eye } from 'lucide-react'; 
+import { Eye } from 'lucide-react';
 
 export type Product = {
   id: number;
@@ -56,7 +55,8 @@ const getStockStatusClass = (status: string) => {
   return 'bg-red-100 text-red-800';
 };
 
-export const productColumns = [
+// Accept onView handler (optional)
+export const productColumns = (onView?: (product: Product) => void) => [
   {
     key: 'thumbnail',
     header: '',
@@ -138,63 +138,22 @@ export const productColumns = [
   },
   {
     key: 'actions',
-    header: '', 
+    header: '',
     render: (item: Product) => {
-      const handleView = () => {
-        let message = `--- Product Details ---\n`;
-        message += `ID: ${item.id}\n`;
-        message += `Title: ${item.title}\n`;
-        message += `Brand: ${item.brand || 'N/A'}\n`;
-        message += `Category: ${item.category || 'N/A'}\n`;
-        message += `Price: $${item.price.toFixed(2)}\n`;
-        if (item.discountPercentage > 0) {
-          message += `Discount: ${item.discountPercentage}%\n`;
-          const discounted = item.price * (1 - item.discountPercentage / 100);
-          message += `Discounted Price: $${discounted.toFixed(2)}\n`;
-        }
-        message += `Stock: ${item.stock} units\n`;
-        message += `Status: ${item.availabilityStatus}\n`;
-        message += `Rating: ${item.rating} / 5\n`;
-        message += `\nDescription:\n${item.description}\n`;
-
-        if (item.warrantyInformation) {
-          message += `\nWarranty: ${item.warrantyInformation}\n`;
-        }
-        if (item.shippingInformation) {
-          message += `Shipping: ${item.shippingInformation}\n`;
-        }
-        if (item.returnPolicy) {
-          message += `Return Policy: ${item.returnPolicy}\n`;
-        }
-        if (item.minimumOrderQuantity) {
-          message += `Min Order Qty: ${item.minimumOrderQuantity}\n`;
-        }
-
-        if (item.reviews && item.reviews.length > 0) {
-          message += `\n--- Reviews (${item.reviews.length}) ---\n`;
-          item.reviews.forEach((review, i) => {
-            message += `\nReview ${i + 1}:\n`;
-            message += `  Rating: ${review.rating}/5\n`;
-            message += `  By: ${review.reviewerName}\n`;
-            message += `  Comment: "${review.comment}"\n`;
-          });
-        }
-
-        alert(message);
-      };
-
       return (
         <div className="flex justify-end">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleView();
-            }}
-            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
-            aria-label="View product details"
-          >
-            <Eye size={16} />
-          </button>
+          {onView && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onView(item);
+              }}
+              className="p-1.5 text-gray-600 hover:bg-gray-50 rounded-md transition-colors"
+              aria-label="View product details"
+            >
+              <Eye size={16} />
+            </button>
+          )}
         </div>
       );
     },
