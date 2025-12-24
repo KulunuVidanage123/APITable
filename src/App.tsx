@@ -33,7 +33,7 @@ function App() {
   const [viewingProduct, setViewingProduct] = useState<Product | null>(null); 
   const [userPage, setUserPage] = useState(1);
   const [productPage, setProductPage] = useState(1);
-  const ITEMS_PER_PAGE = 10;
+  const ITEMS_PER_PAGE = 8;
 
   const [formData, setFormData] = useState({
     firstName: '',
