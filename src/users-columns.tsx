@@ -1,6 +1,7 @@
 // src/users-columns.tsx
 import React from 'react';
 import { Eye, Pencil, Trash2 } from 'lucide-react';
+import { User } from 'types';
 
 const Badge = ({
   variant = 'default',
@@ -28,19 +29,6 @@ const Badge = ({
       {children}
     </span>
   );
-};
-
-// --- User Type ---
-export type User = {
-  id: string;
-  firstName: string;
-  lastName: string;
-  age: number;
-  gender: string;
-  email: string;
-  phone: string;
-  dateOfBirth: string;
-  role: string;
 };
 
 export type UserColumn = {

@@ -1,10 +1,10 @@
 // src/App.tsx
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { ShadcnTable } from './components/ShadcnTable';
 import { Dashboard } from './components/Dashboard';
 import { getColumns as getUserColumns } from './users-columns';
 import { productColumns } from './products-columns';
-import { Product, User } from '../types';
+import { Product, User } from '../types'; 
 import toast from 'react-hot-toast';
 
 type ProductApiResponse = {
@@ -30,10 +30,16 @@ function App() {
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [viewingUser, setViewingUser] = useState<User | null>(null);
-  const [viewingProduct, setViewingProduct] = useState<Product | null>(null); 
+  const [viewingProduct, setViewingProduct] = useState<Product | null>(null);
   const [userPage, setUserPage] = useState(1);
   const [productPage, setProductPage] = useState(1);
   const ITEMS_PER_PAGE = 8;
+
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
     firstName: '',
@@ -44,8 +50,10 @@ function App() {
     phone: '',
     dateOfBirth: '',
     role: '',
+    imageUrl: '',
   });
 
+  // --- Fetch Users (with imageUrl) ---
   const fetchUsers = async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/user`);
@@ -69,6 +77,7 @@ function App() {
         phone: user.phone || '',
         dateOfBirth: user.dateOfBirth || '',
         role: user.role || 'user',
+        imageUrl: user.imageUrl || '', // ✅ Now valid
       }));
 
       setUsers(normalizedUsers);
@@ -113,14 +122,55 @@ function App() {
   const userTotalPages = Math.ceil(filteredUsers.length / ITEMS_PER_PAGE);
   const productTotalPages = Math.ceil(products.length / ITEMS_PER_PAGE);
 
-  // --- Handlers ---
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    setSelectedImage(file);
+    if (file) {
+      const url = URL.createObjectURL(file);
+      setPreviewUrl(url);
+    } else {
+      setPreviewUrl(null);
+    }
+  };
+
+  const uploadImage = async (file: File): Promise<string> => {
+    const formDataImg = new FormData();
+    formDataImg.append('image', file);
+
+    const response = await fetch(`${API_BASE_URL}/upload-image`, {
+      method: 'POST',
+      body: formDataImg,
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to upload image');
+    }
+
+    const result = await response.json();
+    return result.imageUrl;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    let imageUrl = formData.imageUrl;
+
+    if (selectedImage && !editingUserId) {
+      try {
+        setUploadingImage(true);
+        imageUrl = await uploadImage(selectedImage);
+      } catch (err) {
+        console.error('Image upload error:', err);
+        toast.error('Failed to upload profile image');
+        setUploadingImage(false);
+        return;
+      }
+    }
 
     const payload = {
       firstName: formData.firstName,
@@ -131,6 +181,7 @@ function App() {
       phone: formData.phone,
       dateOfBirth: formData.dateOfBirth,
       role: formData.role,
+      imageUrl,
     };
 
     try {
@@ -163,6 +214,8 @@ function App() {
     } catch (err) {
       console.error('Submission error:', err);
       toast.error(err instanceof Error ? err.message : 'Operation failed');
+    } finally {
+      setUploadingImage(false);
     }
   };
 
@@ -176,7 +229,10 @@ function App() {
       phone: '',
       dateOfBirth: '',
       role: '',
+      imageUrl: '',
     });
+    setSelectedImage(null);
+    setPreviewUrl(null);
     setEditingUserId(null);
     setIsUserFormOpen(false);
   };
@@ -211,7 +267,10 @@ function App() {
       phone: user.phone,
       dateOfBirth: user.dateOfBirth,
       role: user.role,
+      imageUrl: user.imageUrl || '',
     });
+    setPreviewUrl(user.imageUrl || null);
+    setSelectedImage(null);
     setIsUserFormOpen(true);
   };
 
@@ -223,6 +282,7 @@ function App() {
     setViewingProduct(product);
   };
 
+  // ✅ Keep Pagination — it's used in JSX below
   const Pagination = ({
     currentPage,
     totalPages,
@@ -360,7 +420,7 @@ function App() {
             <h1 className="text-2xl md:text-3xl font-bold mb-6 text-gray-800 text-center">Products</h1>
             <ShadcnTable
               data={paginatedProducts}
-              columns={productColumns(handleViewProduct)} // ← pass handler
+              columns={productColumns(handleViewProduct)}
             />
             <Pagination
               currentPage={productPage}
@@ -404,7 +464,7 @@ function App() {
           </div>
         )}
 
-        {/* 👤 User View Modal */}
+        {/* User View Modal */}
         {viewingUser && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
@@ -418,6 +478,15 @@ function App() {
                 </button>
               </div>
               <div className="space-y-3 text-sm">
+                {viewingUser.imageUrl && (
+                  <div className="flex justify-center">
+                    <img
+                      src={viewingUser.imageUrl}
+                      alt="Profile"
+                      className="w-20 h-20 rounded-full object-cover border"
+                    />
+                  </div>
+                )}
                 <div><span className="font-medium">ID:</span> {viewingUser.id}</div>
                 <div><span className="font-medium">First Name:</span> {viewingUser.firstName}</div>
                 <div><span className="font-medium">Last Name:</span> {viewingUser.lastName}</div>
@@ -464,42 +533,6 @@ function App() {
                 <div><span className="font-medium">Stock:</span> {viewingProduct.stock}</div>
                 <div><span className="font-medium">Availability:</span> {viewingProduct.availabilityStatus}</div>
                 <div><span className="font-medium">Description:</span> {viewingProduct.description}</div>
-                <div><span className="font-medium">Tags:</span> {viewingProduct.tags?.join(', ') || '—'}</div>
-                <div><span className="font-medium">SKU:</span> {viewingProduct.sku}</div>
-                <div><span className="font-medium">Weight:</span> {viewingProduct.weight} kg</div>
-                <div>
-                  <span className="font-medium">Dimensions (W×H×D):</span>{' '}
-                  {viewingProduct.dimensions
-                    ? `${viewingProduct.dimensions.width} × ${viewingProduct.dimensions.height} × ${viewingProduct.dimensions.depth}`
-                    : '—'}
-                </div>
-                <div><span className="font-medium">Warranty:</span> {viewingProduct.warrantyInformation}</div>
-                <div><span className="font-medium">Shipping:</span> {viewingProduct.shippingInformation}</div>
-                <div><span className="font-medium">Return Policy:</span> {viewingProduct.returnPolicy}</div>
-                <div><span className="font-medium">Min Order Qty:</span> {viewingProduct.minimumOrderQuantity}</div>
-                <div>
-                  <span className="font-medium">Barcode:</span>{' '}
-                  <a
-                    href={`https://barcode.tec-it.com/barcode.png?data=${viewingProduct.meta?.barcode}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline"
-                  >
-                    {viewingProduct.meta?.barcode || '—'}
-                  </a>
-                </div>
-                <div>
-                  <span className="font-medium">QR Code:</span>{' '}
-                  {viewingProduct.meta?.qrCode ? (
-                    <img
-                      src={viewingProduct.meta.qrCode}
-                      alt="QR Code"
-                      className="mt-1 max-w-16"
-                    />
-                  ) : (
-                    '—'
-                  )}
-                </div>
               </div>
               <div className="mt-6 flex justify-end">
                 <button
@@ -529,6 +562,45 @@ function App() {
                 </button>
               </div>
               <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Upload Image
+                  </label>
+                  <div className="flex items-center gap-3">
+                    {previewUrl ? (
+                      <img
+                        src={previewUrl}
+                        alt="Preview"
+                        className="w-12 h-12 rounded object-cover border"
+                      />
+                    ) : formData.imageUrl ? (
+                      <img
+                        src={formData.imageUrl}
+                        alt="Current"
+                        className="w-12 h-12 rounded object-cover border"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 rounded border flex items-center justify-center text-gray-400">
+                        🖼️
+                      </div>
+                    )}
+                    <div>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageChange}
+                        ref={fileInputRef}
+                        className="text-sm text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                      />
+                      {editingUserId && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          Leave empty to keep current image
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
@@ -638,9 +710,10 @@ function App() {
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                    disabled={uploadingImage}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-60"
                   >
-                    {editingUserId ? 'Update User' : 'Add User'}
+                    {uploadingImage ? 'Uploading...' : editingUserId ? 'Update User' : 'Add User'}
                   </button>
                 </div>
               </form>

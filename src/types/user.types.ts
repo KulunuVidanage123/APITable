@@ -9,4 +9,5 @@ export interface User {
   phone: string;
   dateOfBirth: string;
   role: string;
+  imageUrl: string;
 }
