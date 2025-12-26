@@ -4,22 +4,11 @@ import { ShadcnTable } from './components/ShadcnTable';
 import { Dashboard } from './components/Dashboard';
 import { getColumns as getUserColumns } from './users-columns';
 import { productColumns } from './products-columns';
-import { Product, User } from '../types'; 
+import { Product, User } from '../types';
 import toast from 'react-hot-toast';
 
-type ProductApiResponse = {
-  products: Product[];
-  total: number;
-  skip: number;
-  limit: number;
-};
-
 const API_BASE_URL = 'http://localhost:3000/api';
-
-const paginate = <T,>(data: T[], page: number, pageSize: number): T[] => {
-  const startIndex = (page - 1) * pageSize;
-  return data.slice(startIndex, startIndex + pageSize);
-};
+const ITEMS_PER_PAGE = 8;
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -33,7 +22,8 @@ function App() {
   const [viewingProduct, setViewingProduct] = useState<Product | null>(null);
   const [userPage, setUserPage] = useState(1);
   const [productPage, setProductPage] = useState(1);
-  const ITEMS_PER_PAGE = 8;
+
+  const [productTotalCount, setProductTotalCount] = useState(0);
 
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -53,8 +43,7 @@ function App() {
     imageUrl: '',
   });
 
-  // --- Fetch Users (with imageUrl) ---
-  const fetchUsers = async () => {
+  const fetchAllUsers = async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/user`);
       if (!response.ok) {
@@ -77,24 +66,24 @@ function App() {
         phone: user.phone || '',
         dateOfBirth: user.dateOfBirth || '',
         role: user.role || 'user',
-        imageUrl: user.imageUrl || '', // ✅ Now valid
+        imageUrl: user.imageUrl || '',
       }));
 
       setUsers(normalizedUsers);
-      setUserPage(1);
     } catch (err) {
       console.error('Error fetching users:', err);
       toast.error(err instanceof Error ? err.message : 'Failed to load users');
     }
   };
 
-  const fetchProducts = async () => {
+  // Fetch Products with BACKEND pagination
+  const fetchProductsPage = async (page: number) => {
     try {
-      const response = await fetch('https://dummyjson.com/products');
+      const response = await fetch(`https://dummyjson.com/products?skip=${(page - 1) * ITEMS_PER_PAGE}&limit=${ITEMS_PER_PAGE}`);
       if (!response.ok) throw new Error('Failed to fetch products');
-      const data: ProductApiResponse = await response.json();
+      const data = await response.json();
       setProducts(data.products);
-      setProductPage(1);
+      setProductTotalCount(data.total || data.products.length);
     } catch (err) {
       console.error('Error fetching products:', err);
       toast.error(err instanceof Error ? err.message : 'Failed to load products');
@@ -104,7 +93,7 @@ function App() {
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      await Promise.all([fetchProducts(), fetchUsers()]);
+      await Promise.all([fetchProductsPage(1), fetchAllUsers()]);
       setLoading(false);
     };
     loadData();
@@ -116,11 +105,14 @@ function App() {
     return users.filter((user) => user.firstName.toLowerCase().includes(term));
   }, [users, searchTerm]);
 
-  const paginatedUsers = useMemo(() => paginate(filteredUsers, userPage, ITEMS_PER_PAGE), [filteredUsers, userPage]);
-  const paginatedProducts = useMemo(() => paginate(products, productPage, ITEMS_PER_PAGE), [products, productPage]);
+  // Paginate users on frontend
+  const paginatedUsers = useMemo(() => {
+    const startIndex = (userPage - 1) * ITEMS_PER_PAGE;
+    return filteredUsers.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [filteredUsers, userPage]);
 
   const userTotalPages = Math.ceil(filteredUsers.length / ITEMS_PER_PAGE);
-  const productTotalPages = Math.ceil(products.length / ITEMS_PER_PAGE);
+  const productTotalPages = Math.ceil(productTotalCount / ITEMS_PER_PAGE);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -209,7 +201,7 @@ function App() {
         toast.success('User added successfully!');
       }
 
-      await fetchUsers();
+      fetchAllUsers();
       resetForm();
     } catch (err) {
       console.error('Submission error:', err);
@@ -248,8 +240,8 @@ function App() {
         const errorData = await response.json();
         throw new Error(errorData.message || 'Failed to delete user');
       }
-      await fetchUsers();
       toast.success('User deleted successfully!');
+      fetchAllUsers();
     } catch (err) {
       console.error('Delete error:', err);
       toast.error(err instanceof Error ? err.message : 'Delete failed');
@@ -282,7 +274,6 @@ function App() {
     setViewingProduct(product);
   };
 
-  // ✅ Keep Pagination — it's used in JSX below
   const Pagination = ({
     currentPage,
     totalPages,
@@ -317,9 +308,9 @@ function App() {
             <p className="text-sm text-gray-700">
               Showing <span className="font-medium">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> to{' '}
               <span className="font-medium">
-                {Math.min(currentPage * ITEMS_PER_PAGE, currentPage === userPage ? filteredUsers.length : products.length)}
+                {Math.min(currentPage * ITEMS_PER_PAGE, activeTab === 'users' ? filteredUsers.length : productTotalCount)}
               </span>{' '}
-              of <span className="font-medium">{currentPage === userPage ? filteredUsers.length : products.length}</span> results
+              of <span className="font-medium">{activeTab === 'users' ? filteredUsers.length : productTotalCount}</span> results
             </p>
           </div>
           <div>
@@ -335,7 +326,7 @@ function App() {
                 </svg>
               </button>
 
-              {[...Array(totalPages)].map((_, i) => {
+              {[...Array(Math.min(totalPages, 7))].map((_, i) => {
                 const page = i + 1;
                 return (
                   <button
@@ -376,6 +367,15 @@ function App() {
       </div>
     );
   }
+
+  const handleUserPageChange = (page: number) => {
+    setUserPage(page);
+  };
+
+  const handleProductPageChange = (page: number) => {
+    setProductPage(page);
+    fetchProductsPage(page); 
+  };
 
   return (
     <div className="min-h-screen bg-gray-100 p-4 md:p-8">
@@ -418,14 +418,15 @@ function App() {
         ) : activeTab === 'products' ? (
           <div>
             <h1 className="text-2xl md:text-3xl font-bold mb-6 text-gray-800 text-center">Products</h1>
+            {/* Backend-paginated products */}
             <ShadcnTable
-              data={paginatedProducts}
+              data={products}
               columns={productColumns(handleViewProduct)}
             />
             <Pagination
               currentPage={productPage}
               totalPages={productTotalPages}
-              onPageChange={setProductPage}
+              onPageChange={handleProductPageChange}
             />
           </div>
         ) : (
@@ -452,6 +453,7 @@ function App() {
               </button>
             </div>
 
+            {/* Frontend-paginated users */}
             <ShadcnTable
               data={paginatedUsers}
               columns={getUserColumns(handleViewUser, handleEditUser, handleDeleteUser)}
@@ -459,12 +461,11 @@ function App() {
             <Pagination
               currentPage={userPage}
               totalPages={userTotalPages}
-              onPageChange={setUserPage}
+              onPageChange={handleUserPageChange}
             />
           </div>
         )}
 
-        {/* User View Modal */}
         {viewingUser && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
@@ -509,7 +510,6 @@ function App() {
           </div>
         )}
 
-        {/* Product View Modal */}
         {viewingProduct && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
@@ -546,7 +546,6 @@ function App() {
           </div>
         )}
 
-        {/* User Form Modal */}
         {isUserFormOpen && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
