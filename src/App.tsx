@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { ShadcnTable } from './components/ShadcnTable';
 import { Dashboard } from './components/Dashboard';
 import { getColumns as getUserColumns } from './users-columns';
-import { productColumns } from './products-columns';
+import { getProductColumns } from './products-columns';
 import { Product, User } from '../types';
 import toast from 'react-hot-toast';
 
@@ -16,14 +16,15 @@ function App() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [isUserFormOpen, setIsUserFormOpen] = useState(false);
+  const [isProductFormOpen, setIsProductFormOpen] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [productSearchTerm, setProductSearchTerm] = useState('');
   const [viewingUser, setViewingUser] = useState<User | null>(null);
   const [viewingProduct, setViewingProduct] = useState<Product | null>(null);
   const [userPage, setUserPage] = useState(1);
   const [productPage, setProductPage] = useState(1);
-
-  const [productTotalCount, setProductTotalCount] = useState(0);
 
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -31,6 +32,7 @@ function App() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // User form state
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -40,6 +42,18 @@ function App() {
     phone: '',
     dateOfBirth: '',
     role: '',
+    imageUrl: '',
+  });
+
+  // Product form state
+  const [productFormData, setProductFormData] = useState({
+    title: '',
+    brand: '',
+    price: '',
+    category: '',
+    stock: '',
+    rating: '',
+    description: '',
     imageUrl: '',
   });
 
@@ -76,14 +90,32 @@ function App() {
     }
   };
 
-  // Fetch Products with BACKEND pagination
-  const fetchProductsPage = async (page: number) => {
+  const fetchAllProducts = async () => {
     try {
-      const response = await fetch(`https://dummyjson.com/products?skip=${(page - 1) * ITEMS_PER_PAGE}&limit=${ITEMS_PER_PAGE}`);
-      if (!response.ok) throw new Error('Failed to fetch products');
-      const data = await response.json();
-      setProducts(data.products);
-      setProductTotalCount(data.total || data.products.length);
+      const response = await fetch(`${API_BASE_URL}/product`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to fetch products');
+      }
+
+      const result = await response.json();
+      if (!Array.isArray(result.data)) {
+        throw new Error('Invalid response format: data is not an array');
+      }
+
+      const normalizedProducts = result.data.map((product: any) => ({
+        id: product._id,
+        title: product.title,
+        brand: product.brand,
+        price: product.price,
+        category: product.category,
+        stock: product.stock,
+        rating: product.rating,
+        description: product.description || '',
+        imageUrl: product.imageUrl || '',
+      }));
+
+      setProducts(normalizedProducts);
     } catch (err) {
       console.error('Error fetching products:', err);
       toast.error(err instanceof Error ? err.message : 'Failed to load products');
@@ -93,7 +125,7 @@ function App() {
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      await Promise.all([fetchProductsPage(1), fetchAllUsers()]);
+      await Promise.all([fetchAllProducts(), fetchAllUsers()]);
       setLoading(false);
     };
     loadData();
@@ -105,18 +137,41 @@ function App() {
     return users.filter((user) => user.firstName.toLowerCase().includes(term));
   }, [users, searchTerm]);
 
-  // Paginate users on frontend
+  const filteredProducts = useMemo(() => {
+    if (!productSearchTerm.trim()) return products;
+    const term = productSearchTerm.toLowerCase();
+    return products.filter(
+      (product) =>
+        product.title.toLowerCase().includes(term) ||
+        product.brand.toLowerCase().includes(term) ||
+        product.category.toLowerCase().includes(term)
+    );
+  }, [products, productSearchTerm]);
+
+  // ✅ Frontend pagination
   const paginatedUsers = useMemo(() => {
     const startIndex = (userPage - 1) * ITEMS_PER_PAGE;
     return filteredUsers.slice(startIndex, startIndex + ITEMS_PER_PAGE);
   }, [filteredUsers, userPage]);
 
+  const paginatedProducts = useMemo(() => {
+    const startIndex = (productPage - 1) * ITEMS_PER_PAGE;
+    return filteredProducts.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [filteredProducts, productPage]);
+
   const userTotalPages = Math.ceil(filteredUsers.length / ITEMS_PER_PAGE);
-  const productTotalPages = Math.ceil(productTotalCount / ITEMS_PER_PAGE);
+  const productTotalPages = Math.ceil(filteredProducts.length / ITEMS_PER_PAGE);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleProductInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value } = e.target;
+    setProductFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -128,6 +183,23 @@ function App() {
     } else {
       setPreviewUrl(null);
     }
+  };
+
+  const uploadImageToCloudinary = async (file: File): Promise<string> => {
+    const formDataImg = new FormData();
+    formDataImg.append('image', file);
+
+    const response = await fetch(`${API_BASE_URL}/upload-cloudinary`, {
+      method: 'POST',
+      body: formDataImg,
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to upload image to Cloudinary');
+    }
+
+    const result = await response.json();
+    return result.imageUrl;
   };
 
   const uploadImage = async (file: File): Promise<string> => {
@@ -211,6 +283,69 @@ function App() {
     }
   };
 
+  const handleProductSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    let imageUrl = productFormData.imageUrl;
+
+    if (selectedImage) {
+      try {
+        setUploadingImage(true);
+        imageUrl = await uploadImageToCloudinary(selectedImage);
+      } catch (err) {
+        console.error('Image upload error:', err);
+        toast.error('Failed to upload product image');
+        setUploadingImage(false);
+        return;
+      }
+    }
+
+    const payload = {
+      title: productFormData.title,
+      brand: productFormData.brand,
+      price: parseFloat(productFormData.price),
+      category: productFormData.category,
+      stock: parseInt(productFormData.stock, 10),
+      rating: parseFloat(productFormData.rating),
+      description: productFormData.description,
+      imageUrl,
+    };
+
+    try {
+      if (editingProductId) {
+        const response = await fetch(`${API_BASE_URL}/product/${editingProductId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to update product');
+        }
+        toast.success('Product updated successfully!');
+      } else {
+        const response = await fetch(`${API_BASE_URL}/product`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to create product');
+        }
+        toast.success('Product added successfully!');
+      }
+
+      fetchAllProducts();
+      resetProductForm();
+    } catch (err) {
+      console.error('Product submission error:', err);
+      toast.error(err instanceof Error ? err.message : 'Operation failed');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
   const resetForm = () => {
     setFormData({
       firstName: '',
@@ -229,6 +364,23 @@ function App() {
     setIsUserFormOpen(false);
   };
 
+  const resetProductForm = () => {
+    setProductFormData({
+      title: '',
+      brand: '',
+      price: '',
+      category: '',
+      stock: '',
+      rating: '',
+      description: '',
+      imageUrl: '',
+    });
+    setSelectedImage(null);
+    setPreviewUrl(null);
+    setEditingProductId(null);
+    setIsProductFormOpen(false);
+  };
+
   const handleDeleteUser = async (userId: string) => {
     if (!confirm('Are you sure you want to delete this user?')) return;
 
@@ -242,6 +394,25 @@ function App() {
       }
       toast.success('User deleted successfully!');
       fetchAllUsers();
+    } catch (err) {
+      console.error('Delete error:', err);
+      toast.error(err instanceof Error ? err.message : 'Delete failed');
+    }
+  };
+
+  const handleDeleteProduct = async (productId: string) => {
+    if (!confirm('Are you sure you want to delete this product?')) return;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/product/${productId}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to delete product');
+      }
+      toast.success('Product deleted successfully!');
+      fetchAllProducts();
     } catch (err) {
       console.error('Delete error:', err);
       toast.error(err instanceof Error ? err.message : 'Delete failed');
@@ -264,6 +435,23 @@ function App() {
     setPreviewUrl(user.imageUrl || null);
     setSelectedImage(null);
     setIsUserFormOpen(true);
+  };
+
+  const handleEditProduct = (product: Product) => {
+    setEditingProductId(product.id);
+    setProductFormData({
+      title: product.title,
+      brand: product.brand,
+      price: product.price.toString(),
+      category: product.category,
+      stock: product.stock.toString(),
+      rating: product.rating.toString(),
+      description: product.description || '',
+      imageUrl: product.imageUrl || '',
+    });
+    setPreviewUrl(product.imageUrl || null);
+    setSelectedImage(null);
+    setIsProductFormOpen(true);
   };
 
   const handleViewUser = (user: User) => {
@@ -308,9 +496,9 @@ function App() {
             <p className="text-sm text-gray-700">
               Showing <span className="font-medium">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> to{' '}
               <span className="font-medium">
-                {Math.min(currentPage * ITEMS_PER_PAGE, activeTab === 'users' ? filteredUsers.length : productTotalCount)}
+                {Math.min(currentPage * ITEMS_PER_PAGE, activeTab === 'users' ? filteredUsers.length : filteredProducts.length)}
               </span>{' '}
-              of <span className="font-medium">{activeTab === 'users' ? filteredUsers.length : productTotalCount}</span> results
+              of <span className="font-medium">{activeTab === 'users' ? filteredUsers.length : filteredProducts.length}</span> results
             </p>
           </div>
           <div>
@@ -374,7 +562,6 @@ function App() {
 
   const handleProductPageChange = (page: number) => {
     setProductPage(page);
-    fetchProductsPage(page); 
   };
 
   return (
@@ -417,11 +604,33 @@ function App() {
           <Dashboard products={products} users={users} setActiveTab={setActiveTab} />
         ) : activeTab === 'products' ? (
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold mb-6 text-gray-800 text-center">Products</h1>
-            {/* Backend-paginated products */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Products</h1>
+              <div className="w-full md:w-64">
+                <input
+                  type="text"
+                  placeholder="Search products..."
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={productSearchTerm}
+                  onChange={(e) => setProductSearchTerm(e.target.value)}
+                />
+              </div>
+              {/* ✅ Always visible */}
+              <button
+                onClick={() => {
+                  resetProductForm();
+                  setIsProductFormOpen(true);
+                }}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors whitespace-nowrap"
+              >
+                Add Product
+              </button>
+            </div>
+
+            {/* ✅ Always render table + pagination */}
             <ShadcnTable
-              data={products}
-              columns={productColumns(handleViewProduct)}
+              data={paginatedProducts}
+              columns={getProductColumns(handleViewProduct, handleEditProduct, handleDeleteProduct)}
             />
             <Pagination
               currentPage={productPage}
@@ -453,7 +662,6 @@ function App() {
               </button>
             </div>
 
-            {/* Frontend-paginated users */}
             <ShadcnTable
               data={paginatedUsers}
               columns={getUserColumns(handleViewUser, handleEditUser, handleDeleteUser)}
@@ -466,6 +674,10 @@ function App() {
           </div>
         )}
 
+        {/* Modals: User View, Product View, User Form, Product Form */}
+        {/* ... (exactly as in your uploaded file) ... */}
+
+        {/* User View Modal */}
         {viewingUser && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
@@ -510,6 +722,7 @@ function App() {
           </div>
         )}
 
+        {/* Product View Modal */}
         {viewingProduct && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
@@ -523,15 +736,22 @@ function App() {
                 </button>
               </div>
               <div className="space-y-3 text-sm max-h-96 overflow-y-auto pr-2">
+                {viewingProduct.imageUrl && (
+                  <div className="flex justify-center">
+                    <img
+                      src={viewingProduct.imageUrl}
+                      alt="Product"
+                      className="w-20 h-20 rounded object-cover border"
+                    />
+                  </div>
+                )}
                 <div><span className="font-medium">ID:</span> {viewingProduct.id}</div>
                 <div><span className="font-medium">Title:</span> {viewingProduct.title}</div>
-                <div><span className="font-medium">Category:</span> {viewingProduct.category}</div>
                 <div><span className="font-medium">Brand:</span> {viewingProduct.brand}</div>
+                <div><span className="font-medium">Category:</span> {viewingProduct.category}</div>
                 <div><span className="font-medium">Price:</span> ${viewingProduct.price.toFixed(2)}</div>
-                <div><span className="font-medium">Discount:</span> {viewingProduct.discountPercentage}%</div>
-                <div><span className="font-medium">Rating:</span> {viewingProduct.rating} ⭐</div>
                 <div><span className="font-medium">Stock:</span> {viewingProduct.stock}</div>
-                <div><span className="font-medium">Availability:</span> {viewingProduct.availabilityStatus}</div>
+                <div><span className="font-medium">Rating:</span> {viewingProduct.rating} ⭐</div>
                 <div><span className="font-medium">Description:</span> {viewingProduct.description}</div>
               </div>
               <div className="mt-6 flex justify-end">
@@ -546,6 +766,7 @@ function App() {
           </div>
         )}
 
+        {/* User Form Modal */}
         {isUserFormOpen && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
@@ -713,6 +934,170 @@ function App() {
                     className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-60"
                   >
                     {uploadingImage ? 'Uploading...' : editingUserId ? 'Update User' : 'Add User'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Product Form Modal */}
+        {isProductFormOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold text-gray-800">
+                  {editingProductId ? 'Edit Product' : 'Add New Product'}
+                </h2>
+                <button
+                  onClick={resetProductForm}
+                  className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
+                >
+                  &times;
+                </button>
+              </div>
+              <form onSubmit={handleProductSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Upload Image
+                  </label>
+                  <div className="flex items-center gap-3">
+                    {previewUrl ? (
+                      <img
+                        src={previewUrl}
+                        alt="Preview"
+                        className="w-12 h-12 rounded object-cover border"
+                      />
+                    ) : productFormData.imageUrl ? (
+                      <img
+                        src={productFormData.imageUrl}
+                        alt="Current"
+                        className="w-12 h-12 rounded object-cover border"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 rounded border flex items-center justify-center text-gray-400">
+                        🖼️
+                      </div>
+                    )}
+                    <div>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageChange}
+                        ref={fileInputRef}
+                        className="text-sm text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                      />
+                      {editingProductId && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          Leave empty to keep current image
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Product Name</label>
+                    <input
+                      type="text"
+                      name="title"
+                      value={productFormData.title}
+                      onChange={handleProductInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Brand</label>
+                    <input
+                      type="text"
+                      name="brand"
+                      value={productFormData.brand}
+                      onChange={handleProductInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Price ($)</label>
+                      <input
+                        type="number"
+                        name="price"
+                        value={productFormData.price}
+                        onChange={handleProductInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                        min="0"
+                        step="0.01"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                      <input
+                        type="text"
+                        name="category"
+                        value={productFormData.category}
+                        onChange={handleProductInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Stock</label>
+                      <input
+                        type="number"
+                        name="stock"
+                        value={productFormData.stock}
+                        onChange={handleProductInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                        min="0"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Rating (0-5)</label>
+                      <input
+                        type="number"
+                        name="rating"
+                        value={productFormData.rating}
+                        onChange={handleProductInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                        min="0"
+                        max="5"
+                        step="0.1"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <textarea
+                      name="description"
+                      value={productFormData.description}
+                      onChange={handleProductInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      rows={3}
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end space-x-3 mt-6">
+                  <button
+                    type="button"
+                    onClick={resetProductForm}
+                    className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={uploadingImage}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-60"
+                  >
+                    {uploadingImage ? 'Uploading...' : editingProductId ? 'Update Product' : 'Add Product'}
                   </button>
                 </div>
               </form>

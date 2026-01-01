@@ -1,43 +1,15 @@
 // src/types.ts
 
 export type Product = {
-  id: number;
+  id: string; // Changed from number to string to match MongoDB _id
   title: string;
-  description: string;
-  price: number;
-  discountPercentage: number;
-  rating: number;
-  stock: number;
   brand: string;
+  price: number;
   category: string;
-  thumbnail: string;
-  images: string[];
-  availabilityStatus: 'In Stock' | 'Low Stock' | 'Out of Stock';
-  warrantyInformation?: string;
-  shippingInformation?: string;
-  returnPolicy?: string;
-  minimumOrderQuantity?: number;
-  reviews?: Array<{
-    rating: number;
-    comment: string;
-    date: string;
-    reviewerName: string;
-    reviewerEmail: string;
-  }>;
-  meta?: {
-    createdAt: string;
-    updatedAt: string;
-    barcode: string;
-    qrCode: string;
-  };
-  dimensions?: {
-    width: number;
-    height: number;
-    depth: number;
-  };
-  weight?: number;
-  sku?: string;
-  tags?: string[];
+  stock: number;
+  rating: number;
+  description?: string;
+  imageUrl: string;
 };
 
 export type User = {
@@ -50,5 +22,5 @@ export type User = {
   phone: string;
   dateOfBirth: string;
   role: string;
-  imageUrl: string;
+  imageUrl: string; 
 };
