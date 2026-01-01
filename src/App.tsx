@@ -25,11 +25,9 @@ function App() {
   const [viewingProduct, setViewingProduct] = useState<Product | null>(null);
   const [userPage, setUserPage] = useState(1);
   const [productPage, setProductPage] = useState(1);
-
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
-
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // User form state
@@ -64,12 +62,10 @@ function App() {
         const errorData = await response.json();
         throw new Error(errorData.message || 'Failed to fetch users');
       }
-
       const result = await response.json();
       if (!Array.isArray(result.data)) {
         throw new Error('Invalid response format: data is not an array');
       }
-
       const normalizedUsers = result.data.map((user: any) => ({
         id: user._id,
         firstName: user.firstName,
@@ -82,7 +78,6 @@ function App() {
         role: user.role || 'user',
         imageUrl: user.imageUrl || '',
       }));
-
       setUsers(normalizedUsers);
     } catch (err) {
       console.error('Error fetching users:', err);
@@ -97,12 +92,10 @@ function App() {
         const errorData = await response.json();
         throw new Error(errorData.message || 'Failed to fetch products');
       }
-
       const result = await response.json();
       if (!Array.isArray(result.data)) {
         throw new Error('Invalid response format: data is not an array');
       }
-
       const normalizedProducts = result.data.map((product: any) => ({
         id: product._id,
         title: product.title,
@@ -114,7 +107,6 @@ function App() {
         description: product.description || '',
         imageUrl: product.imageUrl || '',
       }));
-
       setProducts(normalizedProducts);
     } catch (err) {
       console.error('Error fetching products:', err);
@@ -148,7 +140,7 @@ function App() {
     );
   }, [products, productSearchTerm]);
 
-  // ✅ Frontend pagination
+  // Frontend pagination
   const paginatedUsers = useMemo(() => {
     const startIndex = (userPage - 1) * ITEMS_PER_PAGE;
     return filteredUsers.slice(startIndex, startIndex + ITEMS_PER_PAGE);
@@ -188,16 +180,13 @@ function App() {
   const uploadImageToCloudinary = async (file: File): Promise<string> => {
     const formDataImg = new FormData();
     formDataImg.append('image', file);
-
     const response = await fetch(`${API_BASE_URL}/upload-cloudinary`, {
       method: 'POST',
       body: formDataImg,
     });
-
     if (!response.ok) {
       throw new Error('Failed to upload image to Cloudinary');
     }
-
     const result = await response.json();
     return result.imageUrl;
   };
@@ -205,25 +194,20 @@ function App() {
   const uploadImage = async (file: File): Promise<string> => {
     const formDataImg = new FormData();
     formDataImg.append('image', file);
-
     const response = await fetch(`${API_BASE_URL}/upload-image`, {
       method: 'POST',
       body: formDataImg,
     });
-
     if (!response.ok) {
       throw new Error('Failed to upload image');
     }
-
     const result = await response.json();
     return result.imageUrl;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     let imageUrl = formData.imageUrl;
-
     if (selectedImage && !editingUserId) {
       try {
         setUploadingImage(true);
@@ -272,7 +256,6 @@ function App() {
         }
         toast.success('User added successfully!');
       }
-
       fetchAllUsers();
       resetForm();
     } catch (err) {
@@ -285,9 +268,7 @@ function App() {
 
   const handleProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     let imageUrl = productFormData.imageUrl;
-
     if (selectedImage) {
       try {
         setUploadingImage(true);
@@ -335,7 +316,6 @@ function App() {
         }
         toast.success('Product added successfully!');
       }
-
       fetchAllProducts();
       resetProductForm();
     } catch (err) {
@@ -383,7 +363,6 @@ function App() {
 
   const handleDeleteUser = async (userId: string) => {
     if (!confirm('Are you sure you want to delete this user?')) return;
-
     try {
       const response = await fetch(`${API_BASE_URL}/user/${userId}`, {
         method: 'DELETE',
@@ -402,7 +381,6 @@ function App() {
 
   const handleDeleteProduct = async (productId: string) => {
     if (!confirm('Are you sure you want to delete this product?')) return;
-
     try {
       const response = await fetch(`${API_BASE_URL}/product/${productId}`, {
         method: 'DELETE',
@@ -472,7 +450,6 @@ function App() {
     onPageChange: (page: number) => void;
   }) => {
     if (totalPages <= 1) return null;
-
     return (
       <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 sm:px-6">
         <div className="flex flex-1 justify-between sm:hidden">
@@ -496,7 +473,10 @@ function App() {
             <p className="text-sm text-gray-700">
               Showing <span className="font-medium">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> to{' '}
               <span className="font-medium">
-                {Math.min(currentPage * ITEMS_PER_PAGE, activeTab === 'users' ? filteredUsers.length : filteredProducts.length)}
+                {Math.min(
+                  currentPage * ITEMS_PER_PAGE,
+                  activeTab === 'users' ? filteredUsers.length : filteredProducts.length
+                )}
               </span>{' '}
               of <span className="font-medium">{activeTab === 'users' ? filteredUsers.length : filteredProducts.length}</span> results
             </p>
@@ -510,10 +490,13 @@ function App() {
               >
                 <span className="sr-only">Previous</span>
                 <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                  <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd" />
+                  <path
+                    fillRule="evenodd"
+                    d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z"
+                    clipRule="evenodd"
+                  />
                 </svg>
               </button>
-
               {[...Array(Math.min(totalPages, 7))].map((_, i) => {
                 const page = i + 1;
                 return (
@@ -530,7 +513,6 @@ function App() {
                   </button>
                 );
               })}
-
               <button
                 onClick={() => onPageChange(currentPage + 1)}
                 disabled={currentPage === totalPages}
@@ -538,7 +520,11 @@ function App() {
               >
                 <span className="sr-only">Next</span>
                 <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                  <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+                  <path
+                    fillRule="evenodd"
+                    d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
+                    clipRule="evenodd"
+                  />
                 </svg>
               </button>
             </nav>
@@ -565,117 +551,117 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4 md:p-8">
-      <div className="max-w-7xl mx-auto w-full">
-        <div className="flex border-b border-gray-200 mb-6">
-          <button
-            onClick={() => setActiveTab('dashboard')}
-            className={`px-4 py-2 font-medium text-sm ${
-              activeTab === 'dashboard'
-                ? 'text-blue-600 border-b-2 border-blue-600'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Dashboard
-          </button>
-          <button
-            onClick={() => setActiveTab('products')}
-            className={`px-4 py-2 font-medium text-sm ${
-              activeTab === 'products'
-                ? 'text-blue-600 border-b-2 border-blue-600'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Products
-          </button>
-          <button
-            onClick={() => setActiveTab('users')}
-            className={`px-4 py-2 font-medium text-sm ${
-              activeTab === 'users'
-                ? 'text-blue-600 border-b-2 border-blue-600'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Users
-          </button>
+    <div className="min-h-screen bg-gray-100 p-0 md:p-16">
+      <div className="max-w-9xl mx-auto w-full">
+        {/* Vertical Sidebar Layout */}
+        <div className="flex flex-col md:flex-row gap-4">
+          {/* Sidebar */}
+          <div className="w-full md:w-40 flex flex-col space-y-2">
+            <button
+              onClick={() => setActiveTab('dashboard')}
+              className={`px-4 py-3 text-left font-medium text-sm rounded-md ${
+                activeTab === 'dashboard'
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Dashboard
+            </button>
+            <button
+              onClick={() => setActiveTab('products')}
+              className={`px-4 py-3 text-left font-medium text-sm rounded-md ${
+                activeTab === 'products'
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Products
+            </button>
+            <button
+              onClick={() => setActiveTab('users')}
+              className={`px-4 py-3 text-left font-medium text-sm rounded-md ${
+                activeTab === 'users'
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Users
+            </button>
+          </div>
+
+          {/* Main Content */}
+          <div className="flex-1">
+            {activeTab === 'dashboard' ? (
+              <Dashboard products={products} users={users} setActiveTab={setActiveTab} />
+            ) : activeTab === 'products' ? (
+              <div>
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                  <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Products</h1>
+                  <div className="w-full md:w-64">
+                    <input
+                      type="text"
+                      placeholder="Search products..."
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      value={productSearchTerm}
+                      onChange={(e) => setProductSearchTerm(e.target.value)}
+                    />
+                  </div>
+                  <button
+                    onClick={() => {
+                      resetProductForm();
+                      setIsProductFormOpen(true);
+                    }}
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors whitespace-nowrap"
+                  >
+                    Add Product
+                  </button>
+                </div>
+                <ShadcnTable
+                  data={paginatedProducts}
+                  columns={getProductColumns(handleViewProduct, handleEditProduct, handleDeleteProduct)}
+                />
+                <Pagination
+                  currentPage={productPage}
+                  totalPages={productTotalPages}
+                  onPageChange={handleProductPageChange}
+                />
+              </div>
+            ) : (
+              <div>
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                  <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Users</h1>
+                  <div className="w-full md:w-64">
+                    <input
+                      type="text"
+                      placeholder="Search by first name..."
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </div>
+                  <button
+                    onClick={() => {
+                      resetForm();
+                      setIsUserFormOpen(true);
+                    }}
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors whitespace-nowrap"
+                  >
+                    Add User
+                  </button>
+                </div>
+                <ShadcnTable
+                  data={paginatedUsers}
+                  columns={getUserColumns(handleViewUser, handleEditUser, handleDeleteUser)}
+                />
+                <Pagination
+                  currentPage={userPage}
+                  totalPages={userTotalPages}
+                  onPageChange={handleUserPageChange}
+                />
+              </div>
+            )}
+          </div>
         </div>
-
-        {activeTab === 'dashboard' ? (
-          <Dashboard products={products} users={users} setActiveTab={setActiveTab} />
-        ) : activeTab === 'products' ? (
-          <div>
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-              <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Products</h1>
-              <div className="w-full md:w-64">
-                <input
-                  type="text"
-                  placeholder="Search products..."
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={productSearchTerm}
-                  onChange={(e) => setProductSearchTerm(e.target.value)}
-                />
-              </div>
-              {/* ✅ Always visible */}
-              <button
-                onClick={() => {
-                  resetProductForm();
-                  setIsProductFormOpen(true);
-                }}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors whitespace-nowrap"
-              >
-                Add Product
-              </button>
-            </div>
-
-            {/* ✅ Always render table + pagination */}
-            <ShadcnTable
-              data={paginatedProducts}
-              columns={getProductColumns(handleViewProduct, handleEditProduct, handleDeleteProduct)}
-            />
-            <Pagination
-              currentPage={productPage}
-              totalPages={productTotalPages}
-              onPageChange={handleProductPageChange}
-            />
-          </div>
-        ) : (
-          <div>
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-              <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Users</h1>
-              <div className="w-full md:w-64">
-                <input
-                  type="text"
-                  placeholder="Search by first name..."
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-              <button
-                onClick={() => {
-                  resetForm();
-                  setIsUserFormOpen(true);
-                }}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors whitespace-nowrap"
-              >
-                Add User
-              </button>
-            </div>
-
-            <ShadcnTable
-              data={paginatedUsers}
-              columns={getUserColumns(handleViewUser, handleEditUser, handleDeleteUser)}
-            />
-            <Pagination
-              currentPage={userPage}
-              totalPages={userTotalPages}
-              onPageChange={handleUserPageChange}
-            />
-          </div>
-        )}
-
-        {/* Modals: User View, Product View, User Form, Product Form */}
-        {/* ... (exactly as in your uploaded file) ... */}
 
         {/* User View Modal */}
         {viewingUser && (
@@ -820,7 +806,6 @@ function App() {
                     </div>
                   </div>
                 </div>
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
@@ -995,7 +980,6 @@ function App() {
                     </div>
                   </div>
                 </div>
-
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Product Name</label>
