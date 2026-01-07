@@ -11,10 +11,15 @@ const API_BASE_URL = 'http://localhost:3000/api';
 const ITEMS_PER_PAGE = 8;
 
 function App() {
+
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [showLogin, setShowLogin] = useState(false);
+  const [showRegister, setShowRegister] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [products, setProducts] = useState<Product[]>([]);
   const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [] = useState(true);
   const [isUserFormOpen, setIsUserFormOpen] = useState(false);
   const [isProductFormOpen, setIsProductFormOpen] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
@@ -30,7 +35,7 @@ function App() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // User form state
+  // Form states
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -43,7 +48,6 @@ function App() {
     imageUrl: '',
   });
 
-  // Product form state
   const [productFormData, setProductFormData] = useState({
     title: '',
     brand: '',
@@ -55,22 +59,88 @@ function App() {
     imageUrl: '',
   });
 
+  const [loginData, setLoginData] = useState({ email: '', password: '' });
+  const [registerData, setRegisterData] = useState({
+    email: '',
+    password: '',
+    role: 'user',
+  });
+
+  useEffect(() => {
+    const initializeAuth = async () => {
+      const token = localStorage.getItem('authToken');
+      
+      if (!token) {
+        setAuthLoading(false);
+        setShowLogin(true);
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/auth/me', {
+          headers: { 
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+          setIsAuthenticated(true);
+          setShowLogin(false);
+          await loadProtectedData();
+        } else {
+          localStorage.removeItem('authToken');
+          setShowLogin(true);
+        }
+      } catch (error) {
+        console.error('Auth initialization error:', error);
+        localStorage.removeItem('authToken');
+        setShowLogin(true);
+      } finally {
+        setAuthLoading(false);
+      }
+    };
+
+    initializeAuth();
+  }, []);
+
+  const loadProtectedData = async () => {
+    try {
+        await Promise.all([fetchAllProducts(), fetchAllUsers()]);
+    } catch (err) {
+        console.error('Failed to load protected ', err);
+        setIsAuthenticated(false);
+        localStorage.removeItem('authToken');
+        setShowLogin(true);
+     } finally {
+    }
+  };
+
   const fetchAllUsers = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/user`);
+      const token = localStorage.getItem('authToken');
+      if (!token) throw new Error('No auth token');
+
+      const response = await fetch('/api/user', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.message || 'Failed to fetch users');
       }
-      const result = await response.json();
-      if (!Array.isArray(result.data)) {
-        throw new Error('Invalid response format: data is not an array');
+
+      const users = await response.json(); 
+
+      if (!Array.isArray(users)) {
+        throw new Error('Invalid user data format');
       }
-      const normalizedUsers = result.data.map((user: any) => ({
+
+      const normalizedUsers = users.map((user: any) => ({
         id: user._id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        age: user.age,
+        firstName: user.firstName || '',
+        lastName: user.lastName || '',
+        age: user.age || 0,
         gender: user.gender || '',
         email: user.email,
         phone: user.phone || '',
@@ -78,6 +148,7 @@ function App() {
         role: user.role || 'user',
         imageUrl: user.imageUrl || '',
       }));
+
       setUsers(normalizedUsers);
     } catch (err) {
       console.error('Error fetching users:', err);
@@ -87,72 +158,106 @@ function App() {
 
   const fetchAllProducts = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/product`);
+      const token = localStorage.getItem('authToken');
+        if (!token) {
+          throw new Error('No auth token found');
+       }
+
+      const response = await fetch('/api/product', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+      });
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to fetch products');
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.message || `Failed to fetch products: ${response.status}`);
       }
-      const result = await response.json();
-      if (!Array.isArray(result.data)) {
-        throw new Error('Invalid response format: data is not an array');
-      }
-      const normalizedProducts = result.data.map((product: any) => ({
-        id: product._id,
-        title: product.title,
-        brand: product.brand,
-        price: product.price,
-        category: product.category,
-        stock: product.stock,
-        rating: product.rating,
-        description: product.description || '',
-        imageUrl: product.imageUrl || '',
-      }));
-      setProducts(normalizedProducts);
-    } catch (err) {
-      console.error('Error fetching products:', err);
-      toast.error(err instanceof Error ? err.message : 'Failed to load products');
+
+      const products = await response.json();
+
+        if (!Array.isArray(products)) {
+          throw new Error('Invalid response format: expected an array of products');
+        }
+
+        const normalizedProducts = products.map((product: any) => ({
+          id: product._id,
+          title: product.title || '',
+          brand: product.brand || '',
+          price: product.price || 0,
+          category: product.category || '',
+          stock: product.stock || 0,
+          rating: product.rating || 0,
+          description: product.description || '',
+          imageUrl: product.imageUrl || '',
+        }));
+
+        setProducts(normalizedProducts);
+      } catch (err) {
+        console.error('Error fetching products:', err);
+        toast.error(err instanceof Error ? err.message : 'Failed to load products');
     }
   };
 
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      await Promise.all([fetchAllProducts(), fetchAllUsers()]);
-      setLoading(false);
-    };
-    loadData();
-  }, []);
+  // Auth handlers
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(loginData),
+      });
 
-  const filteredUsers = useMemo(() => {
-    if (!searchTerm.trim()) return users;
-    const term = searchTerm.toLowerCase();
-    return users.filter((user) => user.firstName.toLowerCase().includes(term));
-  }, [users, searchTerm]);
+      const result = await response.json();
+      localStorage.setItem('authToken', result.token);
 
-  const filteredProducts = useMemo(() => {
-    if (!productSearchTerm.trim()) return products;
-    const term = productSearchTerm.toLowerCase();
-    return products.filter(
-      (product) =>
-        product.title.toLowerCase().includes(term) ||
-        product.brand.toLowerCase().includes(term) ||
-        product.category.toLowerCase().includes(term)
-    );
-  }, [products, productSearchTerm]);
+      if (!response.ok) {
+        throw new Error(result.message || 'Login failed');
+      }
 
-  // Frontend pagination
-  const paginatedUsers = useMemo(() => {
-    const startIndex = (userPage - 1) * ITEMS_PER_PAGE;
-    return filteredUsers.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-  }, [filteredUsers, userPage]);
+      localStorage.setItem('authToken', result.token);
 
-  const paginatedProducts = useMemo(() => {
-    const startIndex = (productPage - 1) * ITEMS_PER_PAGE;
-    return filteredProducts.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-  }, [filteredProducts, productPage]);
+      setIsAuthenticated(true);
 
-  const userTotalPages = Math.ceil(filteredUsers.length / ITEMS_PER_PAGE);
-  const productTotalPages = Math.ceil(filteredProducts.length / ITEMS_PER_PAGE);
+      setShowLogin(false);
+
+      await loadProtectedData(); 
+
+      toast.success('Logged in successfully!');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Login failed');
+    }
+  };
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(registerData),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.message || 'Registration failed');
+      toast.success('Registered successfully! Please log in.');
+      setShowRegister(false);
+      setShowLogin(true);
+      setRegisterData({ email: '', password: '', role: 'user' });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Registration failed');
+    }
+  };
+
+  // Logout
+  const handleLogout = () => {
+    localStorage.removeItem('authToken');
+    setIsAuthenticated(false);
+    setShowLogin(true);
+    setActiveTab('dashboard');
+  };
+
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -236,7 +341,10 @@ function App() {
       if (editingUserId) {
         const response = await fetch(`${API_BASE_URL}/user/${editingUserId}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${localStorage.getItem('authToken')}`,
+          },
           body: JSON.stringify(payload),
         });
         if (!response.ok) {
@@ -247,7 +355,10 @@ function App() {
       } else {
         const response = await fetch(`${API_BASE_URL}/user/register`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${localStorage.getItem('authToken')}`,
+          },
           body: JSON.stringify(payload),
         });
         if (!response.ok) {
@@ -296,7 +407,10 @@ function App() {
       if (editingProductId) {
         const response = await fetch(`${API_BASE_URL}/product/${editingProductId}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${localStorage.getItem('authToken')}`,
+          },
           body: JSON.stringify(payload),
         });
         if (!response.ok) {
@@ -307,7 +421,10 @@ function App() {
       } else {
         const response = await fetch(`${API_BASE_URL}/product`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${localStorage.getItem('authToken')}`,
+          },
           body: JSON.stringify(payload),
         });
         if (!response.ok) {
@@ -366,6 +483,7 @@ function App() {
     try {
       const response = await fetch(`${API_BASE_URL}/user/${userId}`, {
         method: 'DELETE',
+        headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` },
       });
       if (!response.ok) {
         const errorData = await response.json();
@@ -384,6 +502,7 @@ function App() {
     try {
       const response = await fetch(`${API_BASE_URL}/product/${productId}`, {
         method: 'DELETE',
+        headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` },
       });
       if (!response.ok) {
         const errorData = await response.json();
@@ -440,61 +559,28 @@ function App() {
     setViewingProduct(product);
   };
 
-  const Pagination = ({
-    currentPage,
-    totalPages,
-    onPageChange,
-  }: {
-    currentPage: number;
-    totalPages: number;
-    onPageChange: (page: number) => void;
-  }) => {
+  const Pagination = ({ currentPage, totalPages, onPageChange }: { currentPage: number; totalPages: number; onPageChange: (page: number) => void; }) => {
     if (totalPages <= 1) return null;
     return (
       <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 sm:px-6">
         <div className="flex flex-1 justify-between sm:hidden">
-          <button
-            onClick={() => onPageChange(currentPage - 1)}
-            disabled={currentPage === 1}
-            className="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-          >
-            Previous
-          </button>
-          <button
-            onClick={() => onPageChange(currentPage + 1)}
-            disabled={currentPage === totalPages}
-            className="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-          >
-            Next
-          </button>
+          <button onClick={() => onPageChange(currentPage - 1)} disabled={currentPage === 1} className="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">Previous</button>
+          <button onClick={() => onPageChange(currentPage + 1)} disabled={currentPage === totalPages} className="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">Next</button>
         </div>
         <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
           <div>
             <p className="text-sm text-gray-700">
               Showing <span className="font-medium">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> to{' '}
-              <span className="font-medium">
-                {Math.min(
-                  currentPage * ITEMS_PER_PAGE,
-                  activeTab === 'users' ? filteredUsers.length : filteredProducts.length
-                )}
-              </span>{' '}
+              <span className="font-medium">{Math.min(currentPage * ITEMS_PER_PAGE, activeTab === 'users' ? filteredUsers.length : filteredProducts.length)}</span>{' '}
               of <span className="font-medium">{activeTab === 'users' ? filteredUsers.length : filteredProducts.length}</span> results
             </p>
           </div>
           <div>
             <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
-              <button
-                onClick={() => onPageChange(currentPage - 1)}
-                disabled={currentPage === 1}
-                className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50"
-              >
+              <button onClick={() => onPageChange(currentPage - 1)} disabled={currentPage === 1} className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50">
                 <span className="sr-only">Previous</span>
                 <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                  <path
-                    fillRule="evenodd"
-                    d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z"
-                    clipRule="evenodd"
-                  />
+                  <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd" />
                 </svg>
               </button>
               {[...Array(Math.min(totalPages, 7))].map((_, i) => {
@@ -513,18 +599,10 @@ function App() {
                   </button>
                 );
               })}
-              <button
-                onClick={() => onPageChange(currentPage + 1)}
-                disabled={currentPage === totalPages}
-                className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50"
-              >
+              <button onClick={() => onPageChange(currentPage + 1)} disabled={currentPage === totalPages} className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50">
                 <span className="sr-only">Next</span>
                 <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                  <path
-                    fillRule="evenodd"
-                    d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
-                    clipRule="evenodd"
-                  />
+                  <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
                 </svg>
               </button>
             </nav>
@@ -534,13 +612,35 @@ function App() {
     );
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
-      </div>
+  const filteredUsers = useMemo(() => {
+    if (!searchTerm.trim()) return users;
+    const term = searchTerm.toLowerCase();
+    return users.filter((user) => user.firstName.toLowerCase().includes(term));
+  }, [users, searchTerm]);
+
+  const filteredProducts = useMemo(() => {
+    if (!productSearchTerm.trim()) return products;
+    const term = productSearchTerm.toLowerCase();
+    return products.filter(
+      (product) =>
+        product.title.toLowerCase().includes(term) ||
+        product.brand.toLowerCase().includes(term) ||
+        product.category.toLowerCase().includes(term)
     );
-  }
+  }, [products, productSearchTerm]);
+
+  const paginatedUsers = useMemo(() => {
+    const startIndex = (userPage - 1) * ITEMS_PER_PAGE;
+    return filteredUsers.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [filteredUsers, userPage]);
+
+  const paginatedProducts = useMemo(() => {
+    const startIndex = (productPage - 1) * ITEMS_PER_PAGE;
+    return filteredProducts.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [filteredProducts, productPage]);
+
+  const userTotalPages = Math.ceil(filteredUsers.length / ITEMS_PER_PAGE);
+  const productTotalPages = Math.ceil(filteredProducts.length / ITEMS_PER_PAGE);
 
   const handleUserPageChange = (page: number) => {
     setUserPage(page);
@@ -550,13 +650,144 @@ function App() {
     setProductPage(page);
   };
 
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+        {/* Login Modal */}
+        {showLogin && (
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">Log In</h2>
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <input
+                  type="email"
+                  value={loginData.email}
+                  onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                <input
+                  type="password"
+                  value={loginData.password}
+                  onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+              <button
+                type="submit"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+              >
+                Log In
+              </button>
+              <div className="text-center text-sm text-gray-600 mt-2">
+                Don't have an account?{' '}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowLogin(false);
+                    setShowRegister(true);
+                  }}
+                  className="text-blue-600 hover:underline"
+                >
+                  Register
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* Register Modal */}
+        {showRegister && (
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">Register</h2>
+            <form onSubmit={handleRegister} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <input
+                  type="email"
+                  value={registerData.email}
+                  onChange={(e) => setRegisterData({ ...registerData, email: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                <input
+                  type="password"
+                  value={registerData.password}
+                  onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                <select
+                  value={registerData.role}
+                  onChange={(e) => setRegisterData({ ...registerData, role: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="user">User</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+              <button
+                type="submit"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+              >
+                Register
+              </button>
+              <div className="text-center text-sm text-gray-600 mt-2">
+                Already have an account?{' '}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowRegister(false);
+                    setShowLogin(true);
+                  }}
+                  className="text-blue-600 hover:underline"
+                >
+                  Log In
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gray-100 p-0 md:p-16">
-      <div className="max-w-9xl mx-auto w-full">
+    <div className="min-h-screen bg-gray-100 p-0 md:p-6">
+      <div className="max-w-7xl mx-auto w-full">
+        {/* Top bar with Logout */}
+        <div className="flex justify-end mb-4">
+          <button
+            onClick={handleLogout}
+            className="text-sm text-gray-600 hover:text-gray-900"
+          >
+            Logout
+          </button>
+        </div>
+
         {/* Vertical Sidebar Layout */}
-        <div className="flex flex-col md:flex-row gap-4">
+        <div className="flex flex-col md:flex-row gap-6">
           {/* Sidebar */}
-          <div className="w-full md:w-40 flex flex-col space-y-2">
+          <div className="w-full md:w-48 flex flex-col space-y-2">
             <button
               onClick={() => setActiveTab('dashboard')}
               className={`px-4 py-3 text-left font-medium text-sm rounded-md ${
