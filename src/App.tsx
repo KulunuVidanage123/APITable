@@ -312,6 +312,7 @@ function App() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     let imageUrl = formData.imageUrl;
+    
     if (selectedImage && !editingUserId) {
       try {
         setUploadingImage(true);
@@ -324,6 +325,7 @@ function App() {
       }
     }
 
+    // ✅ Add source field to distinguish dashboard users
     const payload = {
       firstName: formData.firstName,
       lastName: formData.lastName,
@@ -334,6 +336,7 @@ function App() {
       dateOfBirth: formData.dateOfBirth,
       role: formData.role,
       imageUrl,
+      source: 'dashboard', // 🔑 Critical: mark as dashboard-created user
     };
 
     try {
