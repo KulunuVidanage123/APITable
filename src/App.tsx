@@ -119,19 +119,16 @@ function App() {
   const fetchAllUsers = async () => {
     try {
       const token = localStorage.getItem('authToken');
-      if (!token) throw new Error('No auth token');
-
-      const response = await fetch('/api/user', {
-        headers: { 'Authorization': `Bearer ${token}` }
+      const response = await fetch('/api/user', { 
+        headers: { Authorization: `Bearer ${token}` }
       });
-
+      
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.message || 'Failed to fetch users');
       }
 
-      const users = await response.json(); 
-
+      const users = await response.json();
       if (!Array.isArray(users)) {
         throw new Error('Invalid user data format');
       }
