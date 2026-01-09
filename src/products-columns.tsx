@@ -1,9 +1,8 @@
 // src/products-columns.tsx
 import { Eye, Pencil, Trash2 } from 'lucide-react';
 import type { Product } from '../types'; 
-
 const renderStars = (rating?: number) => {
-  const safeRating = rating ?? 0; // ✅ Default to 0 if undefined
+  const safeRating = rating ?? 0;
   return (
     <div className="flex items-center">
       {[...Array(5)].map((_, i) => (
@@ -34,7 +33,8 @@ const getStockStatusClass = (stock: number) => {
 export const getProductColumns = (
   onView?: (product: Product) => void,
   onEdit?: (product: Product) => void,
-  onDelete?: (productId: string) => void
+  onDelete?: (productId: string) => void,
+  userRole?: 'user' | 'admin' | 'manager' 
 ) => [
   {
     key: 'imageUrl',
@@ -99,9 +99,9 @@ export const getProductColumns = (
     ),
   },
   {
-  key: 'rating',
-  header: 'Rating',
-  render: (item: Product) => renderStars(item.rating), // ✅ Now safe
+    key: 'rating',
+    header: 'Rating',
+    render: (item: Product) => renderStars(item.rating),
   },
   {
     key: 'actions',
@@ -121,7 +121,7 @@ export const getProductColumns = (
               <Eye size={16} />
             </button>
           )}
-          {onEdit && (
+          {userRole === 'admin' && onEdit && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -133,7 +133,7 @@ export const getProductColumns = (
               <Pencil size={16} />
             </button>
           )}
-          {onDelete && (
+          {userRole === 'admin' && onDelete && (
             <button
               onClick={(e) => {
                 e.stopPropagation();

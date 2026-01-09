@@ -34,8 +34,8 @@ function App() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [userRole, setUserRole] = useState<'user' | 'admin' | 'manager'>('user');
 
-  // Form states
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -78,14 +78,13 @@ function App() {
 
       try {
         const response = await fetch('/api/auth/me', {
-          headers: { 
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
+          headers: { Authorization: `Bearer ${token}` }
         });
 
         if (response.ok) {
+          const userData = await response.json();
           setIsAuthenticated(true);
+          setUserRole(userData.role); 
           setShowLogin(false);
           await loadProtectedData();
         } else {
@@ -124,13 +123,13 @@ function App() {
       });
       
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Failed to fetch users');
+        // const errorData = await response.json().catch(() => ({}));
+        // throw new Error(errorData.message || 'Failed to fetch users');
       }
 
       const users = await response.json();
       if (!Array.isArray(users)) {
-        throw new Error('Invalid user data format');
+        // throw new Error('Invalid user data format');
       }
 
       const normalizedUsers = users.map((user: any) => ({
@@ -215,6 +214,7 @@ function App() {
 
       localStorage.setItem('authToken', result.token);
 
+      setUserRole(result.user.role); 
       setIsAuthenticated(true);
 
       setShowLogin(false);
@@ -322,7 +322,6 @@ function App() {
       }
     }
 
-    // ✅ Add source field to distinguish dashboard users
     const payload = {
       firstName: formData.firstName,
       lastName: formData.lastName,
@@ -773,7 +772,6 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-100 p-0 md:p-6">
       <div className="max-w-7xl mx-auto w-full">
-        {/* Top bar with Logout */}
         <div className="flex justify-end mb-4">
           <button
             onClick={handleLogout}
@@ -785,7 +783,6 @@ function App() {
 
         {/* Vertical Sidebar Layout */}
         <div className="flex flex-col md:flex-row gap-6">
-          {/* Sidebar */}
           <div className="w-full md:w-48 flex flex-col space-y-2">
             <button
               onClick={() => setActiveTab('dashboard')}
@@ -807,22 +804,24 @@ function App() {
             >
               Products
             </button>
-            <button
-              onClick={() => setActiveTab('users')}
-              className={`px-4 py-3 text-left font-medium text-sm rounded-md ${
-                activeTab === 'users'
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Users
-            </button>
+            {userRole === 'admin' && (
+              <button
+                onClick={() => setActiveTab('users')}
+                className={`px-4 py-3 text-left font-medium text-sm rounded-md ${
+                  activeTab === 'users'
+                    ? 'bg-blue-100 text-blue-700'
+                    : 'text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Users
+              </button>
+            )}
           </div>
 
           {/* Main Content */}
           <div className="flex-1">
             {activeTab === 'dashboard' ? (
-              <Dashboard products={products} users={users} setActiveTab={setActiveTab} />
+              <Dashboard products={products} users={users} userRole={userRole} setActiveTab={setActiveTab} />
             ) : activeTab === 'products' ? (
               <div>
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
@@ -836,19 +835,26 @@ function App() {
                       onChange={(e) => setProductSearchTerm(e.target.value)}
                     />
                   </div>
-                  <button
-                    onClick={() => {
-                      resetProductForm();
-                      setIsProductFormOpen(true);
-                    }}
-                    className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors whitespace-nowrap"
-                  >
-                    Add Product
-                  </button>
+                  {userRole === 'admin' && (
+                    <button
+                      onClick={() => {
+                        resetProductForm();
+                        setIsProductFormOpen(true);
+                      }}
+                      className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors whitespace-nowrap"
+                    >
+                      Add Product
+                    </button>
+                  )}
                 </div>
                 <ShadcnTable
                   data={paginatedProducts}
-                  columns={getProductColumns(handleViewProduct, handleEditProduct, handleDeleteProduct)}
+                  columns={getProductColumns(
+                    handleViewProduct,
+                    handleEditProduct,
+                    handleDeleteProduct,
+                    userRole 
+                  )}
                 />
                 <Pagination
                   currentPage={productPage}
@@ -869,15 +875,17 @@ function App() {
                       onChange={(e) => setSearchTerm(e.target.value)}
                     />
                   </div>
-                  <button
-                    onClick={() => {
-                      resetForm();
-                      setIsUserFormOpen(true);
-                    }}
-                    className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors whitespace-nowrap"
-                  >
-                    Add User
-                  </button>
+                  {userRole === 'admin' && (
+                    <button
+                      onClick={() => {
+                        resetForm();
+                        setIsUserFormOpen(true);
+                      }}
+                      className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors whitespace-nowrap"
+                    >
+                      Add User
+                    </button>
+                  )}
                 </div>
                 <ShadcnTable
                   data={paginatedUsers}

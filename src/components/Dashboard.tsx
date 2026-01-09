@@ -24,6 +24,7 @@ interface DashboardUser {
 interface DashboardProps {
   products?: Product[];
   users?: User[];
+  userRole: 'user' | 'admin' | 'manager';
   setActiveTab?: React.Dispatch<React.SetStateAction<string>>;
 }
 
@@ -120,9 +121,12 @@ const getSalesDataByCategory = (products: Product[]) => {
 export function Dashboard({ 
   products: propProducts, 
   users: propUsers = [], 
+  userRole,
   setActiveTab: propSetActiveTab 
 }: DashboardProps) {
-  const [activeTab, setActiveTab] = useState("products");
+  const initialTab = userRole === 'admin' ? 'products' : 'products';
+  const [activeTab, setActiveTab] = useState<'products' | 'users'>(initialTab);
+  
   const [dashboardData, setDashboardData] = useState({
     totalRevenue: "$0.00",
     totalUsers: "0",
@@ -168,7 +172,7 @@ export function Dashboard({
         setLoading(true);
         const response = await fetch('https://dummyjson.com/products');
         if (!response.ok) throw new Error('Failed to fetch products');
-        const  { products: fetchedProducts } = await response.json();
+        const { products: fetchedProducts } = await response.json();
         
         const totalRevenue = fetchedProducts.reduce(
           (sum: number, product: Product) => sum + product.price * product.stock,
@@ -193,12 +197,13 @@ export function Dashboard({
     fetchProducts();
   }, [propProducts, propUsers]);
 
-  const handleTabChange = (tab: string) => {
+  const handleTabChange = (tab: 'products' | 'users') => {
+    if (tab === 'users' && userRole !== 'admin') return;
+    
     if (propSetActiveTab) {
       propSetActiveTab(tab);
-    } else {
-      setActiveTab(tab);
     }
+    setActiveTab(tab);
   };
 
   if (loading && !propProducts) {
@@ -335,12 +340,14 @@ export function Dashboard({
                   >
                     Products
                   </Button>
-                  <Button
-                    variant={activeTab === "users" ? "default" : "outline"}
-                    onClick={() => handleTabChange("users")}
-                  >
-                    Users
-                  </Button>
+                  {userRole === 'admin' && (
+                    <Button
+                      variant={activeTab === "users" ? "default" : "outline"}
+                      onClick={() => handleTabChange("users")}
+                    >
+                      Users
+                    </Button>
+                  )}
                 </div>
               </CardHeader>
               <CardContent>
@@ -367,7 +374,7 @@ export function Dashboard({
                       </tbody>
                     </table>
                   </div>
-                ) : (
+                ) : userRole === 'admin' ? (
                   <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-gray-50">
@@ -390,7 +397,7 @@ export function Dashboard({
                       </tbody>
                     </table>
                   </div>
-                )}
+                ) : null}
               </CardContent>
             </Card>
           </div>
