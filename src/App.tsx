@@ -11,7 +11,6 @@ const API_BASE_URL = 'http://localhost:3000/api';
 const ITEMS_PER_PAGE = 8;
 
 function App() {
-
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
   const [showLogin, setShowLogin] = useState(false);
@@ -19,7 +18,6 @@ function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [products, setProducts] = useState<Product[]>([]);
   const [users, setUsers] = useState<User[]>([]);
-  const [] = useState(true);
   const [isUserFormOpen, setIsUserFormOpen] = useState(false);
   const [isProductFormOpen, setIsProductFormOpen] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
@@ -36,6 +34,14 @@ function App() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [userRole, setUserRole] = useState<'user' | 'admin' | 'manager'>('user');
 
+  const [inquiryForm, setInquiryForm] = useState({
+    name: '',
+    email: '',
+    mobile: '',
+    message: '',
+  });
+  const [submittingInquiry, setSubmittingInquiry] = useState(false);
+
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -47,7 +53,6 @@ function App() {
     role: '',
     imageUrl: '',
   });
-
   const [productFormData, setProductFormData] = useState({
     title: '',
     brand: '',
@@ -58,7 +63,6 @@ function App() {
     description: '',
     imageUrl: '',
   });
-
   const [loginData, setLoginData] = useState({ email: '', password: '' });
   const [registerData, setRegisterData] = useState({
     email: '',
@@ -69,22 +73,19 @@ function App() {
   useEffect(() => {
     const initializeAuth = async () => {
       const token = localStorage.getItem('authToken');
-      
       if (!token) {
         setAuthLoading(false);
         setShowLogin(true);
         return;
       }
-
       try {
         const response = await fetch('/api/auth/me', {
           headers: { Authorization: `Bearer ${token}` }
         });
-
         if (response.ok) {
           const userData = await response.json();
           setIsAuthenticated(true);
-          setUserRole(userData.role); 
+          setUserRole(userData.role);
           setShowLogin(false);
           await loadProtectedData();
         } else {
@@ -99,39 +100,27 @@ function App() {
         setAuthLoading(false);
       }
     };
-
     initializeAuth();
   }, []);
 
   const loadProtectedData = async () => {
     try {
-        await Promise.all([fetchAllProducts(), fetchAllUsers()]);
+      await Promise.all([fetchAllProducts(), fetchAllUsers()]);
     } catch (err) {
-        console.error('Failed to load protected ', err);
-        setIsAuthenticated(false);
-        localStorage.removeItem('authToken');
-        setShowLogin(true);
-     } finally {
+      console.error('Failed to load protected ', err);
+      setIsAuthenticated(false);
+      localStorage.removeItem('authToken');
+      setShowLogin(true);
     }
   };
 
   const fetchAllUsers = async () => {
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch('/api/user', { 
+      const response = await fetch('/api/user', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
-      if (!response.ok) {
-        // const errorData = await response.json().catch(() => ({}));
-        // throw new Error(errorData.message || 'Failed to fetch users');
-      }
-
       const users = await response.json();
-      if (!Array.isArray(users)) {
-        // throw new Error('Invalid user data format');
-      }
-
       const normalizedUsers = users.map((user: any) => ({
         id: user._id,
         firstName: user.firstName || '',
@@ -144,7 +133,6 @@ function App() {
         role: user.role || 'user',
         imageUrl: user.imageUrl || '',
       }));
-
       setUsers(normalizedUsers);
     } catch (err) {
       console.error('Error fetching users:', err);
@@ -155,44 +143,28 @@ function App() {
   const fetchAllProducts = async () => {
     try {
       const token = localStorage.getItem('authToken');
-        if (!token) {
-          throw new Error('No auth token found');
-       }
-
       const response = await fetch('/api/product', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
       });
-
-      if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.message || `Failed to fetch products: ${response.status}`);
-      }
-
       const products = await response.json();
-
-        if (!Array.isArray(products)) {
-          throw new Error('Invalid response format: expected an array of products');
-        }
-
-        const normalizedProducts = products.map((product: any) => ({
-          id: product._id,
-          title: product.title || '',
-          brand: product.brand || '',
-          price: product.price || 0,
-          category: product.category || '',
-          stock: product.stock || 0,
-          rating: product.rating || 0,
-          description: product.description || '',
-          imageUrl: product.imageUrl || '',
-        }));
-
-        setProducts(normalizedProducts);
-      } catch (err) {
-        console.error('Error fetching products:', err);
-        toast.error(err instanceof Error ? err.message : 'Failed to load products');
+      const normalizedProducts = products.map((product: any) => ({
+        id: product._id,
+        title: product.title || '',
+        brand: product.brand || '',
+        price: product.price || 0,
+        category: product.category || '',
+        stock: product.stock || 0,
+        rating: product.rating || 0,
+        description: product.description || '',
+        imageUrl: product.imageUrl || '',
+      }));
+      setProducts(normalizedProducts);
+    } catch (err) {
+      console.error('Error fetching products:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to load products');
     }
   };
 
@@ -204,23 +176,15 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(loginData),
       });
-
       const result = await response.json();
-      localStorage.setItem('authToken', result.token);
-
       if (!response.ok) {
         throw new Error(result.message || 'Login failed');
       }
-
       localStorage.setItem('authToken', result.token);
-
-      setUserRole(result.user.role); 
+      setUserRole(result.user.role);
       setIsAuthenticated(true);
-
       setShowLogin(false);
-
-      await loadProtectedData(); 
-
+      await loadProtectedData();
       toast.success('Logged in successfully!');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Login failed');
@@ -246,7 +210,6 @@ function App() {
     }
   };
 
-  // Logout
   const handleLogout = () => {
     localStorage.removeItem('authToken');
     setIsAuthenticated(false);
@@ -254,6 +217,35 @@ function App() {
     setActiveTab('dashboard');
   };
 
+  // Handle Inquiry Submission
+  const handleInquirySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmittingInquiry(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/inquiry`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(inquiryForm),
+      });
+
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || 'Failed to send inquiry');
+
+      toast.success('Inquiry sent successfully! We’ll contact you soon.');
+      setInquiryForm({ name: '', email: '', mobile: '', message: '' });
+    } catch (err) {
+      console.error('Inquiry error:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to send inquiry');
+    } finally {
+      setSubmittingInquiry(false);
+    }
+  };
+
+  const handleInquiryChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setInquiryForm((prev) => ({ ...prev, [name]: value }));
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -278,20 +270,6 @@ function App() {
     }
   };
 
-  const uploadImageToCloudinary = async (file: File): Promise<string> => {
-    const formDataImg = new FormData();
-    formDataImg.append('image', file);
-    const response = await fetch(`${API_BASE_URL}/upload-cloudinary`, {
-      method: 'POST',
-      body: formDataImg,
-    });
-    if (!response.ok) {
-      throw new Error('Failed to upload image to Cloudinary');
-    }
-    const result = await response.json();
-    return result.imageUrl;
-  };
-
   const uploadImage = async (file: File): Promise<string> => {
     const formDataImg = new FormData();
     formDataImg.append('image', file);
@@ -309,7 +287,6 @@ function App() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     let imageUrl = formData.imageUrl;
-    
     if (selectedImage && !editingUserId) {
       try {
         setUploadingImage(true);
@@ -321,7 +298,6 @@ function App() {
         return;
       }
     }
-
     const payload = {
       firstName: formData.firstName,
       lastName: formData.lastName,
@@ -332,9 +308,8 @@ function App() {
       dateOfBirth: formData.dateOfBirth,
       role: formData.role,
       imageUrl,
-      source: 'dashboard', // 🔑 Critical: mark as dashboard-created user
+      source: 'dashboard',
     };
-
     try {
       if (editingUserId) {
         const response = await fetch(`${API_BASE_URL}/user/${editingUserId}`, {
@@ -381,7 +356,7 @@ function App() {
     if (selectedImage) {
       try {
         setUploadingImage(true);
-        imageUrl = await uploadImageToCloudinary(selectedImage);
+        imageUrl = await uploadImage(selectedImage);
       } catch (err) {
         console.error('Image upload error:', err);
         toast.error('Failed to upload product image');
@@ -389,7 +364,6 @@ function App() {
         return;
       }
     }
-
     const payload = {
       title: productFormData.title,
       brand: productFormData.brand,
@@ -400,7 +374,6 @@ function App() {
       description: productFormData.description,
       imageUrl,
     };
-
     try {
       if (editingProductId) {
         const response = await fetch(`${API_BASE_URL}/product/${editingProductId}`, {
@@ -561,10 +534,6 @@ function App() {
     if (totalPages <= 1) return null;
     return (
       <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 sm:px-6">
-        <div className="flex flex-1 justify-between sm:hidden">
-          <button onClick={() => onPageChange(currentPage - 1)} disabled={currentPage === 1} className="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">Previous</button>
-          <button onClick={() => onPageChange(currentPage + 1)} disabled={currentPage === totalPages} className="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">Next</button>
-        </div>
         <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
           <div>
             <p className="text-sm text-gray-700">
@@ -706,7 +675,6 @@ function App() {
             </form>
           </div>
         )}
-
         {/* Register Modal */}
         {showRegister && (
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
@@ -816,6 +784,17 @@ function App() {
                 Users
               </button>
             )}
+            {/* Inquiry Tab - visible to all authenticated users */}
+            <button
+              onClick={() => setActiveTab('inquiry')}
+              className={`px-4 py-3 text-left font-medium text-sm rounded-md ${
+                activeTab === 'inquiry'
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Inquiry
+            </button>
           </div>
 
           {/* Main Content */}
@@ -849,12 +828,7 @@ function App() {
                 </div>
                 <ShadcnTable
                   data={paginatedProducts}
-                  columns={getProductColumns(
-                    handleViewProduct,
-                    handleEditProduct,
-                    handleDeleteProduct,
-                    userRole 
-                  )}
+                  columns={getProductColumns(handleViewProduct, handleEditProduct, handleDeleteProduct, userRole)}
                 />
                 <Pagination
                   currentPage={productPage}
@@ -862,7 +836,7 @@ function App() {
                   onPageChange={handleProductPageChange}
                 />
               </div>
-            ) : (
+            ) : activeTab === 'users' ? (
               <div>
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
                   <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Users</h1>
@@ -896,6 +870,63 @@ function App() {
                   totalPages={userTotalPages}
                   onPageChange={handleUserPageChange}
                 />
+              </div>
+            ) : (
+              /* Inquiry Form Section */
+              <div className="max-w-3xl mx-auto">
+                <h1 className="text-3xl md:text-3xl font-bold text-gray-800 mb-8">Create Inquiry</h1>
+                <form onSubmit={handleInquirySubmit} className="space-y-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+                    <input
+                      type="text"
+                      name="name"
+                      value={inquiryForm.name}
+                      onChange={handleInquiryChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                    <input
+                      type="email"
+                      name="email"
+                      value={inquiryForm.email}
+                      onChange={handleInquiryChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Mobile</label>
+                    <input
+                      type="tel"
+                      name="mobile"
+                      value={inquiryForm.mobile}
+                      onChange={handleInquiryChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Message *</label>
+                    <textarea
+                      name="message"
+                      value={inquiryForm.message}
+                      onChange={handleInquiryChange}
+                      rows={5}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={submittingInquiry}
+                    className="w-500px bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors disabled:opacity-60"
+                  >
+                    {submittingInquiry ? 'Sending...' : 'Send Inquiry'}
+                  </button>
+                </form>
               </div>
             )}
           </div>
