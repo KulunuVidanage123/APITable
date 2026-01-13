@@ -34,6 +34,7 @@ function App() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [userRole, setUserRole] = useState<'user' | 'admin' | 'manager'>('user');
 
+  // Inquiry form state
   const [inquiryForm, setInquiryForm] = useState({
     name: '',
     email: '',
@@ -64,10 +65,10 @@ function App() {
     imageUrl: '',
   });
   const [loginData, setLoginData] = useState({ email: '', password: '' });
+
   const [registerData, setRegisterData] = useState({
     email: '',
-    password: '',
-    role: 'user',
+    role: 'user', 
   });
 
   useEffect(() => {
@@ -201,10 +202,11 @@ function App() {
       });
       const result = await res.json();
       if (!res.ok) throw new Error(result.message || 'Registration failed');
-      toast.success('Registered successfully! Please log in.');
+      
+      toast.success('Registered successfully! Check your email for your password.');
       setShowRegister(false);
       setShowLogin(true);
-      setRegisterData({ email: '', password: '', role: 'user' });
+      setRegisterData({ email: '', role: 'user' });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Registration failed');
     }
@@ -221,17 +223,14 @@ function App() {
   const handleInquirySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmittingInquiry(true);
-
     try {
       const response = await fetch(`${API_BASE_URL}/inquiry`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(inquiryForm),
       });
-
       const result = await response.json();
       if (!response.ok) throw new Error(result.message || 'Failed to send inquiry');
-
       toast.success('Inquiry sent successfully! We’ll contact you soon.');
       setInquiryForm({ name: '', email: '', mobile: '', message: '' });
     } catch (err) {
@@ -298,6 +297,7 @@ function App() {
         return;
       }
     }
+
     const payload = {
       firstName: formData.firstName,
       lastName: formData.lastName,
@@ -310,6 +310,7 @@ function App() {
       imageUrl,
       source: 'dashboard',
     };
+
     try {
       if (editingUserId) {
         const response = await fetch(`${API_BASE_URL}/user/${editingUserId}`, {
@@ -364,6 +365,7 @@ function App() {
         return;
       }
     }
+
     const payload = {
       title: productFormData.title,
       brand: productFormData.brand,
@@ -374,6 +376,7 @@ function App() {
       description: productFormData.description,
       imageUrl,
     };
+
     try {
       if (editingProductId) {
         const response = await fetch(`${API_BASE_URL}/product/${editingProductId}`, {
@@ -675,7 +678,7 @@ function App() {
             </form>
           </div>
         )}
-        {/* Register Modal */}
+
         {showRegister && (
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <h2 className="text-2xl font-bold text-gray-800 mb-4">Register</h2>
@@ -691,16 +694,6 @@ function App() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                <input
-                  type="password"
-                  value={registerData.password}
-                  onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
-              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
                 <select
                   value={registerData.role}
@@ -710,7 +703,7 @@ function App() {
                   <option value="user">User</option>
                   <option value="admin">Admin</option>
                 </select>
-              </div>
+              </div>s5
               <button
                 type="submit"
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
@@ -784,7 +777,7 @@ function App() {
                 Users
               </button>
             )}
-            {/* Inquiry Tab - visible to all authenticated users */}
+            {/* Inquiry Tab */}
             <button
               onClick={() => setActiveTab('inquiry')}
               className={`px-4 py-3 text-left font-medium text-sm rounded-md ${
@@ -873,7 +866,7 @@ function App() {
               </div>
             ) : (
               /* Inquiry Form Section */
-              <div className="max-w-3xl mx-auto">
+              <div className="max-w-4xl mx-auto">
                 <h1 className="text-3xl md:text-3xl font-bold text-gray-800 mb-8">Create Inquiry</h1>
                 <form onSubmit={handleInquirySubmit} className="space-y-6">
                   <div>
@@ -932,7 +925,7 @@ function App() {
           </div>
         </div>
 
-        {/* User View Modal */}
+        {/* Modals */}
         {viewingUser && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
@@ -977,7 +970,6 @@ function App() {
           </div>
         )}
 
-        {/* Product View Modal */}
         {viewingProduct && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
@@ -1359,7 +1351,6 @@ function App() {
         )}
 
         <div className="mt-8 text-center text-gray-500 text-sm">
-          {/* &copy; {new Date().getFullYear()} */}
         </div>
       </div>
     </div>
